@@ -109,7 +109,8 @@
                 🔐 管理者ログイン
             </button>
             
-            <h1>🏆 チームドラフトシステム</h1>
+            <h1>🏆 3チームドラフトシステム</h1>
+            <p>複数端末からリアルタイムにメンバーをドラフト</p>
             
             <!-- 👤 ユーザー設定（右上） -->
             <div class="user-settings">
@@ -120,7 +121,7 @@
         </header>
 
         <!-- 🔌 接続状況 -->
-        <div id="connectionStatus" class="connection-status disconnected">🔴 システム 未接続</div>
+        <div id="connectionStatus" class="connection-status disconnected">🔴 Firebase 未接続</div>
 
         <!-- 🏠 ルーム設定 -->
         <section class="room-setup">
@@ -274,7 +275,7 @@
                 db.ref('.info/connected').on('value', snap => {
                     const connected = snap.val() === true;
                     updateConnectionStatus(connected ? 'connected' : 'disconnected', 
-                        connected ? '🟢 システム に接続しました' : '🔴 システム との接続が切断されました');
+                        connected ? '🟢 Firebase に接続しました' : '🔴 Firebase との接続が切断されました');
                     
                     // 接続成功時にルーム監視を開始
                     if(connected) {
@@ -410,19 +411,27 @@
             
             updateDisplay();
             updateOnlineUsers();
-            updateConnectionStatus('connected', '🟢 システム に接続しました（ルーム未参加）');
+            updateConnectionStatus('connected', '🟢 Firebase に接続しました（ルーム未参加）');
             
             if(showAlert) {
                 alert('ルームから退室しました');
             }
             
-            // 退室後に該当ルームのユーザー数をチェック
+            // 退室後に該当ルームのユーザー数をチェック（ゲーム開始済みは削除しない）
             setTimeout(() => {
-                db.ref(`rooms/${leavingRoom}/users`).once('value', snap => {
-                    const users = snap.val();
-                    if(!users || Object.keys(users).length === 0) {
-                        console.log(`ルーム ${leavingRoom} が空になったため削除します`);
-                        db.ref(`rooms/${leavingRoom}`).remove();
+                db.ref(`rooms/${leavingRoom}`).once('value', snap => {
+                    const roomData = snap.val();
+                    if(roomData) {
+                        const hasUsers = roomData.users && Object.keys(roomData.users).length > 0;
+                        const gameStarted = roomData.gameState && roomData.gameState.gameStarted;
+                        
+                        // ユーザーが0人で、かつゲームが開始されていないルームのみ削除
+                        if(!hasUsers && !gameStarted) {
+                            console.log(`ルーム ${leavingRoom} が空になり、ゲーム未開始のため削除します`);
+                            db.ref(`rooms/${leavingRoom}`).remove();
+                        } else if(!hasUsers && gameStarted) {
+                            console.log(`ルーム ${leavingRoom} は空ですが、ゲーム開始済みのため保持します`);
+                        }
                     }
                 });
             }, 500);
@@ -550,19 +559,28 @@
                 console.log('ルーム一覧取得:', rooms);
                 updateRoomList(rooms);
                 
-                // 0人のルームを自動削除（管理者機能として実装）
+                // 0人のルームを自動削除（ゲーム開始済みのルームは除外）
                 Object.keys(rooms).forEach(roomName => {
                     const room = rooms[roomName];
-                    if(!room.users || Object.keys(room.users).length === 0) {
+                    const hasUsers = room.users && Object.keys(room.users).length > 0;
+                    const gameStarted = room.gameState && room.gameState.gameStarted;
+                    
+                    // ユーザーが0人で、かつゲームが開始されていないルームのみ削除
+                    if(!hasUsers && !gameStarted) {
                         console.log(`空のルーム ${roomName} を削除します`);
                         // 1秒後に再確認して削除
                         setTimeout(() => {
-                            db.ref(`rooms/${roomName}/users`).once('value', checkSnap => {
-                                const checkUsers = checkSnap.val();
-                                if(!checkUsers || Object.keys(checkUsers).length === 0) {
-                                    db.ref(`rooms/${roomName}`).remove()
-                                        .then(() => console.log(`ルーム ${roomName} を削除しました`))
-                                        .catch(err => console.error(`ルーム削除エラー:`, err));
+                            db.ref(`rooms/${roomName}`).once('value', roomSnap => {
+                                const roomData = roomSnap.val();
+                                if(roomData) {
+                                    const stillNoUsers = !roomData.users || Object.keys(roomData.users).length === 0;
+                                    const stillNotStarted = !roomData.gameState || !roomData.gameState.gameStarted;
+                                    
+                                    if(stillNoUsers && stillNotStarted) {
+                                        db.ref(`rooms/${roomName}`).remove()
+                                            .then(() => console.log(`ルーム ${roomName} を削除しました`))
+                                            .catch(err => console.error(`ルーム削除エラー:`, err));
+                                    }
                                 }
                             });
                         }, 1000);
@@ -588,6 +606,7 @@
                 const room = rooms[roomName];
                 const userCount = room.users ? Object.keys(room.users).length : 0;
                 const memberCount = room.gameState && room.gameState.members ? room.gameState.members.length : 0;
+                const gameStarted = room.gameState && room.gameState.gameStarted;
                 const isCurrentRoom = roomName === currentRoom;
                 
                 return `
@@ -597,6 +616,7 @@
                         <strong>${roomName}</strong>
                         <div style="font-size:.7rem;margin-top:2px">
                             👥 ${userCount}人 | 📋 ${memberCount}名登録
+                            ${gameStarted ? ' | 🎮 ゲーム中' : ''}
                             ${isCurrentRoom ? ' (参加中)' : ''}
                         </div>
                     </div>

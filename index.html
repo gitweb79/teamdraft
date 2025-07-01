@@ -77,7 +77,10 @@
         .team.drag-over{background-color:rgba(79,172,254,0.1);border-style:dashed}
         .available-members.drag-over{background-color:rgba(255,193,7,0.2);border-style:dashed}
 
-        /* モバイル用の追加スタイル */
+        .room-item{position:relative;background:#87ceeb;color:white;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:.85rem}
+        .room-item.current{background:#28a745}
+        .room-item .delete-room-btn{position:absolute;right:4px;top:4px;background:rgba(220,53,69,0.8);color:white;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+        .room-item .delete-room-btn:hover{background:#dc3545}
         @media (hover: none) and (pointer: coarse) {
             .member-item, .team-member {
                 -webkit-touch-callout: none;
@@ -94,14 +97,19 @@
         @media(max-width:480px){
             input[type=text],button{flex:1 1 100%}
             .user-settings{position:static;transform:none;margin-top:10px;background:rgba(255,255,255,0.3);width:100%}
+            #adminLoginBtn{position:static!important;transform:none!important;margin-bottom:10px;width:100%}
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <h1>🏆 3チームドラフトシステム</h1>
-            <p>複数端末からリアルタイムにメンバーをドラフト</p>
+            <!-- 管理者ログインボタン（左上） -->
+            <button id="adminLoginBtn" onclick="showAdminLogin()" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);padding:8px 16px;font-size:.8rem;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.5)">
+                🔐 管理者ログイン
+            </button>
+            
+            <h1>🏆 チームドラフトシステム</h1>
             
             <!-- 👤 ユーザー設定（右上） -->
             <div class="user-settings">
@@ -112,7 +120,7 @@
         </header>
 
         <!-- 🔌 接続状況 -->
-        <div id="connectionStatus" class="connection-status disconnected">🔴 Firebase 未接続</div>
+        <div id="connectionStatus" class="connection-status disconnected">🔴 システム 未接続</div>
 
         <!-- 🏠 ルーム設定 -->
         <section class="room-setup">
@@ -141,8 +149,8 @@
         </div>
 
         <main class="content">
-            <!-- 👥 メンバー登録 -->
-            <section class="section">
+            <!-- 👥 メンバー登録（管理者のみ） -->
+            <section class="section admin-only" style="display:none">
                 <h2>メンバー登録</h2>
                 <div class="member-registration">
                     <div class="form-group">
@@ -155,8 +163,8 @@
 
             <!-- 🎮 コントロール -->
             <div class="game-controls">
-                <button id="startGameBtn" onclick="startGame()" disabled>ルームに参加してください</button>
-                <button class="reset-btn" onclick="resetGame()" disabled>完全リセット</button>
+                <button id="startGameBtn" class="admin-only" style="display:none" onclick="startGame()" disabled>ルームに参加してください</button>
+                <button class="reset-btn admin-only" style="display:none" onclick="resetGame()" disabled>完全リセット</button>
             </div>
 
             <!-- ⏱️ ターン表示 -->
@@ -200,6 +208,18 @@
             </section>
         </main>
     </div>
+    <!-- 管理者ログインダイアログ -->
+    <div id="adminDialog" class="admin-dialog">
+        <div class="admin-dialog-content">
+            <h3>🔐 管理者ログイン</h3>
+            <input type="text" id="adminId" placeholder="ユーザーID" />
+            <input type="password" id="adminPassword" placeholder="パスワード" />
+            <div class="admin-dialog-buttons">
+                <button onclick="closeAdminLogin()">キャンセル</button>
+                <button onclick="doAdminLogin()">ログイン</button>
+            </div>
+        </div>
+    </div>
 
 
     <!-- ============================================================ -->
@@ -225,6 +245,7 @@
         let app, db, currentRoom = null;
         const userId = `user_${Math.random().toString(36).slice(2,9)}`;
         let userName = localStorage.getItem('draftUserName') || userId;
+        let isAdmin = false;
         let connectedUsers = {};
         let roomListListener = null;
         let draggedMember = null;
@@ -253,7 +274,7 @@
                 db.ref('.info/connected').on('value', snap => {
                     const connected = snap.val() === true;
                     updateConnectionStatus(connected ? 'connected' : 'disconnected', 
-                        connected ? '🟢 Firebase に接続しました' : '🔴 Firebase との接続が切断されました');
+                        connected ? '🟢 システム に接続しました' : '🔴 システム との接続が切断されました');
                     
                     // 接続成功時にルーム監視を開始
                     if(connected) {
@@ -277,9 +298,11 @@
             el.textContent = msg;
         };
         const enableUI = () => {
-            qs('#memberName').disabled = false;
-            qs('#addMemberBtn').disabled = false;
-            qs('.reset-btn').disabled = false;
+            if(isAdmin) {
+                qs('#memberName').disabled = false;
+                qs('#addMemberBtn').disabled = false;
+                qs('.reset-btn').disabled = false;
+            }
         };
 
         // ======= 5) ルーム参加／作成 =======
@@ -309,7 +332,8 @@
             updateConnectionStatus('connecting','🟡 ルームに接続中…');
 
             // gameState 監視
-            db.ref(`rooms/${room}/gameState`).on('value', snap=>{
+            const gameStateRef = db.ref(`rooms/${room}/gameState`);
+            gameStateRef.on('value', snap=>{
                 if(snap.exists()){
                     gameState = snap.val();
                     // データの整合性チェック
@@ -329,6 +353,14 @@
                 updateDisplay();
             });
 
+            // ルームが削除された場合の処理
+            db.ref(`rooms/${room}`).on('value', snap => {
+                if(!snap.exists() && currentRoom === room) {
+                    alert('ルームが削除されました');
+                    leaveRoom(false);
+                }
+            });
+
             // オンラインユーザー監視
             db.ref(`rooms/${room}/users`).on('value', snap=>{
                 connectedUsers = snap.val()||{};
@@ -339,6 +371,7 @@
             const userRef = db.ref(`rooms/${room}/users/${userId}`);
             userRef.set({
                 name: userName,
+                isAdmin: isAdmin,
                 joinedAt: firebase.database.ServerValue.TIMESTAMP
             });
             userRef.onDisconnect().remove();
@@ -354,6 +387,8 @@
         const leaveRoom = (showAlert = true) => {
             if(!currentRoom) return;
 
+            const leavingRoom = currentRoom; // 退室するルーム名を保存
+            
             // リスナー解除
             db.ref(`rooms/${currentRoom}`).off();
             
@@ -375,15 +410,31 @@
             
             updateDisplay();
             updateOnlineUsers();
-            updateConnectionStatus('connected', '🟢 Firebase に接続しました（ルーム未参加）');
+            updateConnectionStatus('connected', '🟢 システム に接続しました（ルーム未参加）');
             
             if(showAlert) {
                 alert('ルームから退室しました');
             }
+            
+            // 退室後に該当ルームのユーザー数をチェック
+            setTimeout(() => {
+                db.ref(`rooms/${leavingRoom}/users`).once('value', snap => {
+                    const users = snap.val();
+                    if(!users || Object.keys(users).length === 0) {
+                        console.log(`ルーム ${leavingRoom} が空になったため削除します`);
+                        db.ref(`rooms/${leavingRoom}`).remove();
+                    }
+                });
+            }, 500);
         };
 
         // ユーザー名更新
         const updateUserName = () => {
+            if(isAdmin) {
+                alert('管理者名は変更できません');
+                return;
+            }
+            
             const newName = qs('#userNameInput').value.trim();
             if(!newName) {
                 alert('ユーザー名を入力してください');
@@ -401,6 +452,83 @@
             }
             
             alert('ユーザー名を変更しました');
+        };
+
+        // 管理者ログイン
+        const showAdminLogin = () => {
+            qs('#adminDialog').style.display = 'block';
+            qs('#adminId').value = '';
+            qs('#adminPassword').value = '';
+            qs('#adminId').focus();
+        };
+
+        const closeAdminLogin = () => {
+            qs('#adminDialog').style.display = 'none';
+        };
+
+        const doAdminLogin = () => {
+            const id = qs('#adminId').value;
+            const password = qs('#adminPassword').value;
+            
+            if(id === 'admin' && password === 'admin') {
+                isAdmin = true;
+                userName = 'admin';
+                localStorage.setItem('isAdmin', 'true');
+                
+                // UI更新
+                qs('#currentUserName').innerHTML = 'admin<span class="admin-badge">管理者</span>';
+                qs('#userNameInput').style.display = 'none';
+                qs('#userNameInput').nextElementSibling.style.display = 'none';
+                qs('#adminLoginBtn').textContent = '🔓 管理者ログアウト';
+                qs('#adminLoginBtn').onclick = doAdminLogout;
+                
+                // 管理者専用要素を表示
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    el.style.display = '';
+                });
+                
+                // ルーム参加中なら名前を更新
+                if(currentRoom && db) {
+                    db.ref(`rooms/${currentRoom}/users/${userId}/name`).set('admin');
+                    db.ref(`rooms/${currentRoom}/users/${userId}/isAdmin`).set(true);
+                }
+                
+                closeAdminLogin();
+                updateDisplay();
+                alert('管理者としてログインしました');
+            } else {
+                alert('IDまたはパスワードが正しくありません');
+            }
+        };
+
+        const doAdminLogout = () => {
+            if(!confirm('管理者からログアウトしますか？')) return;
+            
+            isAdmin = false;
+            localStorage.removeItem('isAdmin');
+            userName = localStorage.getItem('draftUserName') || userId;
+            
+            // UI更新
+            qs('#currentUserName').textContent = userName;
+            qs('#userNameInput').style.display = '';
+            qs('#userNameInput').nextElementSibling.style.display = '';
+            qs('#userNameInput').value = userName;
+            qs('#adminLoginBtn').textContent = '🔐 管理者ログイン';
+            qs('#adminLoginBtn').onclick = showAdminLogin;
+            
+            // 管理者専用要素を非表示
+            document.querySelectorAll('.admin-only').forEach(el => {
+                el.style.display = 'none';
+            });
+            
+            // ルーム参加中なら名前を更新
+            if(currentRoom && db) {
+                db.ref(`rooms/${currentRoom}/users/${userId}/name`).set(userName);
+                db.ref(`rooms/${currentRoom}/users/${userId}/isAdmin`).set(false);
+            }
+            
+            updateDisplay();
+            alert('管理者からログアウトしました');
         };
 
         // アクティブルーム監視
@@ -421,6 +549,25 @@
                 const rooms = snap.val() || {};
                 console.log('ルーム一覧取得:', rooms);
                 updateRoomList(rooms);
+                
+                // 0人のルームを自動削除（管理者機能として実装）
+                Object.keys(rooms).forEach(roomName => {
+                    const room = rooms[roomName];
+                    if(!room.users || Object.keys(room.users).length === 0) {
+                        console.log(`空のルーム ${roomName} を削除します`);
+                        // 1秒後に再確認して削除
+                        setTimeout(() => {
+                            db.ref(`rooms/${roomName}/users`).once('value', checkSnap => {
+                                const checkUsers = checkSnap.val();
+                                if(!checkUsers || Object.keys(checkUsers).length === 0) {
+                                    db.ref(`rooms/${roomName}`).remove()
+                                        .then(() => console.log(`ルーム ${roomName} を削除しました`))
+                                        .catch(err => console.error(`ルーム削除エラー:`, err));
+                                }
+                            });
+                        }, 1000);
+                    }
+                });
             }, error => {
                 console.error('ルーム一覧取得エラー:', error);
                 qs('#roomList').innerHTML = '<div class="empty-state">ルーム一覧の取得に失敗しました</div>';
@@ -444,8 +591,9 @@
                 const isCurrentRoom = roomName === currentRoom;
                 
                 return `
-                    <div style="background:${isCurrentRoom ? '#28a745' : '#87ceeb'};color:white;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:.85rem" 
+                    <div class="room-item ${isCurrentRoom ? 'current' : ''}" 
                          onclick="${isCurrentRoom ? '' : `document.getElementById('roomInput').value='${roomName}';joinRoom()`}">
+                        ${(userCount > 0 && isAdmin) ? `<button class="delete-room-btn" onclick="event.stopPropagation(); deleteRoom('${roomName}')" title="ルーム削除">×</button>` : ''}
                         <strong>${roomName}</strong>
                         <div style="font-size:.7rem;margin-top:2px">
                             👥 ${userCount}人 | 📋 ${memberCount}名登録
@@ -454,6 +602,33 @@
                     </div>
                 `;
             }).join('');
+        };
+
+        // ルーム削除
+        const deleteRoom = (roomName) => {
+            if(!isAdmin) {
+                alert('管理者のみがルームを削除できます');
+                return;
+            }
+            
+            if(!confirm(`ルーム「${roomName}」を削除しますか？\n参加中のメンバーは全員退出されます。`)) return;
+            
+            // 自分が参加中のルームの場合は先に退出
+            if(currentRoom === roomName) {
+                leaveRoom(false);
+            }
+            
+            // Firebaseからルームを削除
+            if(db) {
+                db.ref(`rooms/${roomName}`).remove()
+                    .then(() => {
+                        alert(`ルーム「${roomName}」を削除しました`);
+                    })
+                    .catch(error => {
+                        console.error('ルーム削除エラー:', error);
+                        alert('ルームの削除に失敗しました');
+                    });
+            }
         };
 
         // ======= 6) オンラインユーザー表示 =======
@@ -476,6 +651,7 @@
 
         // ======= 7) メンバー追加 =======
         const addMember = () => {
+            if(!isAdmin){alert('管理者のみがメンバーを追加できます');return;}
             if(!currentRoom){alert('ルームに参加してください');return;}
             const name = qs('#memberName').value.trim();
             if(!name){alert('メンバー名を入力してください');return;}
@@ -504,6 +680,10 @@
 
         const selectMember = (memberName) => {
             if(!canSelectMember()){alert('現在選択権がありません');return;}
+            
+            // 確認ポップアップを表示
+            if(!confirm(`${memberName}さんを選択しますか？`)) return;
+            
             const idx = gameState.members.findIndex(m=>m.name===memberName);
             if(idx===-1 || !gameState.members[idx].available) return;
             
@@ -539,6 +719,7 @@
 
         // ======= 9) ゲーム開始／リセット =======
         const startGame = () => {
+            if(!isAdmin){alert('管理者のみがゲームを開始できます');return;}
             if(gameState.gameStarted) return;
             if(!gameState.members || gameState.members.length < 3){
                 alert('最低3名のメンバーが必要です');
@@ -558,6 +739,7 @@
         };
 
         const resetGame = () => {
+            if(!isAdmin){alert('管理者のみがリセットできます');return;}
             if(!confirm('チームメンバーを控えに戻しますか？')) return;
             
             // 各チームのメンバーを控えに戻す
@@ -614,14 +796,14 @@
             container.innerHTML = available.map(m=>`
                 <div class="member-item ${canSelectMember()?'selectable':''}" 
                      onclick="selectMember('${m.name}')"
-                     draggable="true"
+                     ${isAdmin ? `draggable="true"
                      ondragstart="handleDragStart(event, '${m.name}', 'available')"
                      ondragend="handleDragEnd(event)"
                      ontouchstart="handleTouchStart(event, '${m.name}', 'available')"
                      ontouchmove="handleTouchMove(event)"
-                     ontouchend="handleTouchEnd(event)">
+                     ontouchend="handleTouchEnd(event)"` : ''}>
                     <span>${m.name}</span>
-                    <button class="delete-btn" onclick="event.stopPropagation(); deleteMember('${m.name}')" title="削除">×</button>
+                    ${isAdmin ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteMember('${m.name}')" title="削除">×</button>` : ''}
                     ${canSelectMember()?'<span style="font-size:.7rem;color:#28a745;margin-right:30px">選択</span>':''}
                 </div>
             `).join('');
@@ -637,12 +819,12 @@
                 }
                 listEl.innerHTML = members.map((name,i)=>`
                     <div class="team-member" 
-                         draggable="true"
+                         ${isAdmin ? `draggable="true"
                          ondragstart="handleDragStart(event, '${name}', '${t}')"
                          ondragend="handleDragEnd(event)"
                          ontouchstart="handleTouchStart(event, '${name}', '${t}')"
                          ontouchmove="handleTouchMove(event)"
-                         ontouchend="handleTouchEnd(event)">
+                         ontouchend="handleTouchEnd(event)"` : ''}>
                         ${i===0?'👑 ':''}${name}${i===0?' (代表)':''}
                     </div>
                 `).join('');
@@ -710,6 +892,8 @@
         
         // PC用ドラッグ
         const handleDragStart = (e, memberName, from) => {
+            if(!isAdmin) return; // 管理者のみドラッグ可能
+            
             if(e.type === 'dragstart') {
                 draggedMember = memberName;
                 draggedFrom = from;
@@ -758,6 +942,8 @@
 
         // モバイル用タッチ
         const handleTouchStart = (e, memberName, from) => {
+            if(!isAdmin) return; // 管理者のみドラッグ可能
+            
             touchItem = e.target;
             touchTimeout = setTimeout(() => {
                 isDragging = true;
@@ -864,6 +1050,11 @@
 
         // メンバー削除
         const deleteMember = (memberName) => {
+            if(!isAdmin) {
+                alert('管理者のみがメンバーを削除できます');
+                return;
+            }
+            
             if(!confirm(`${memberName}を削除しますか？`)) return;
             
             // membersから削除

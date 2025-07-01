@@ -126,3 +126,265 @@
             <section class="game-area">
                 <!-- 控えメンバー -->
                 <div class="available-members">
+                    <h3>控えメンバー</h3>
+                    <div id="availableMembers"><div class="empty-state">ルームに参加してください</div></div>
+                </div>
+
+                <!-- チーム -->
+                <div class="teams-container">
+                    <div id="teamA" class="team team-a"><h3>🔴 チームA</h3><div id="teamAMembers" class="team–list"><div class="empty-state">メンバーなし</div></div></div>
+                    <div id="teamB" class="team team-b"><h3>🟢 チームB</h3><div id="teamBMembers" class="team–list"><div class="empty-state">メンバーなし</div></div></div>
+                    <div id="teamC" class="team team-c"><h3>🔵 チームC</h3><div id="teamCMembers" class="team–list"><div class="empty-state">メンバーなし</div></div></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+
+    <!-- ============================================================ -->
+    <!--  Firebase SDK (compat v9)  -->
+    <!-- ============================================================ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+
+    <script>
+        // ======= 1) Firebase 設定  =======
+        const firebaseConfig = {
+            apiKey: "AIzaSyB-H74YVpBA8BPMFtWMOJvMRRkHyMoTT6k",
+            authDomain: "team-draft-app.firebaseapp.com",
+            databaseURL: "https://team-draft-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "team-draft-app",
+            storageBucket: "team-draft-app.firebasestorage.app",
+            messagingSenderId: "865072849567",
+            appId: "1:865072849567:web:878f3c25f867900914b8aa",
+            measurementId: "G-TE7255NTDR"
+        };
+
+        // ======= 2) 変数初期化 =======
+        let app, db, currentRoom = null;
+        const userId = `user_${Math.random().toString(36).slice(2,9)}`;
+        let connectedUsers = {};
+        let gameState = {};
+
+        // デフォルト状態を返す関数
+        const initialGameState = () => ({
+            members: [],               // {name, available}
+            teams: { A: [], B: [], C: [] },
+            gameStarted: false,
+            isSelectingLeaders: true,
+            leaderSelected: { A:false, B:false, C:false },
+            currentTeam: 'A'
+        });
+
+        // ======= 3) Firebase 初期化 =======
+        const initFirebase = () => {
+            try {
+                app = firebase.initializeApp(firebaseConfig);
+                db  = firebase.database();
+
+                // 接続状況監視
+                db.ref('.info/connected').on('value', snap => {
+                    const connected = snap.val() === true;
+                    updateConnectionStatus(connected ? 'connected' : 'disconnected', connected ? '🟢 Firebase に接続しました' : '🔴 Firebase との接続が切断されました');
+                });
+                return true;
+            } catch (e) {
+                console.error(e);
+                updateConnectionStatus('disconnected', 'Firebase 初期化失敗');
+                return false;
+            }
+        };
+
+        // ======= 4) UI ヘルパ =======
+        const qs = s => document.querySelector(s);
+        const updateConnectionStatus = (cls,msg)=>{
+            const el = qs('#connectionStatus');
+            el.className = `connection-status ${cls}`;
+            el.textContent = msg;
+        };
+        const enableUI = () => {
+            qs('#memberName').disabled = false;
+            qs('button[onclick="addMember()"]').disabled = false;
+            qs('button[onclick="resetGame()"]').disabled = false;
+        };
+
+        // ======= 5) ルーム参加／作成 =======
+        const createRandomRoom = () => {
+            const rnd = `room_${Math.random().toString(36).slice(2,8)}`;
+            qs('#roomInput').value = rnd;
+            joinRoom();
+        };
+
+        const joinRoom = () => {
+            if(!db){alert('Firebase 未接続');return;}
+            const room = qs('#roomInput').value.trim();
+            if(!room){alert('ルーム名を入力してください');return;}
+
+            // 旧リスナ解除
+            if(currentRoom) db.ref(`rooms/${currentRoom}`).off();
+            currentRoom = room;
+            updateConnectionStatus('connecting','🟡 ルームに接続中…');
+
+            // gameState 監視
+            db.ref(`rooms/${room}/gameState`).on('value', snap=>{
+                if(snap.exists()){
+                    gameState = snap.val();
+                }else{
+                    gameState = initialGameState();
+                    db.ref(`rooms/${room}/gameState`).set(gameState);
+                }
+                updateDisplay();
+            });
+
+            // オンラインユーザー監視
+            db.ref(`rooms/${room}/users`).on('value', snap=>{
+                connectedUsers = snap.val()||{};updateOnlineUsers();
+            });
+
+            // 自分を登録 & 切断時削除
+            const userRef = db.ref(`rooms/${room}/users/${userId}`);
+            userRef.set({joinedAt:firebase.database.ServerValue.TIMESTAMP});
+            userRef.onDisconnect().remove();
+
+            enableUI();
+            qs('#turnIndicator').style.display='block';
+            updateConnectionStatus('connected',`🟢 ルーム "${room}" に参加中`);
+            updateDisplay();
+        };
+
+        // ======= 6) オンラインユーザー表示 =======
+        const updateOnlineUsers = () => {
+            const container = qs('#onlineUsers');
+            const list = qs('#userList');
+            qs('#userCount').textContent = Object.keys(connectedUsers).length;
+            if(Object.keys(connectedUsers).length){
+                container.style.display='block';
+                list.innerHTML = Object.keys(connectedUsers).map(uid=>`<span class="user-badge">${uid}</span>`).join('');
+            }else container.style.display='none';
+        };
+
+        // ======= 7) メンバー追加 =======
+        const addMember = () => {
+            if(!currentRoom){alert('ルームに参加してください');return;}
+            const name = qs('#memberName').value.trim();
+            if(!name){alert('メンバー名を入力してください');return;}
+            if(gameState.members.some(m=>m.name===name)){alert('同名のメンバーがいます');return;}
+            gameState.members.push({name,available:true});
+            qs('#memberName').value='';
+            syncGameState();
+        };
+
+        // ======= 8) ドラフトロジック =======
+        const canSelectMember = () => {
+            if(!gameState.gameStarted) return false;
+            if(gameState.isSelectingLeaders) return !gameState.leaderSelected[gameState.currentTeam];
+            return gameState.members.some(m=>m.available);
+        };
+
+        const selectMember = (memberName) => {
+            if(!canSelectMember()){alert('現在選択権がありません');return;}
+            const idx = gameState.members.findIndex(m=>m.name===memberName);
+            if(idx===-1 || !gameState.members[idx].available) return;
+            // 配属
+            gameState.members[idx].available=false;
+            gameState.teams[gameState.currentTeam].push(memberName);
+
+            if(gameState.isSelectingLeaders){
+                gameState.leaderSelected[gameState.currentTeam] = true;
+                if(!gameState.leaderSelected.A) gameState.currentTeam='A';
+                else if(!gameState.leaderSelected.B) gameState.currentTeam='B';
+                else if(!gameState.leaderSelected.C) gameState.currentTeam='C';
+                else {gameState.isSelectingLeaders=false;gameState.currentTeam='A';}
+            }else{
+                // 通常ピック: A→B→C 循環
+                const order=['A','B','C'];
+                gameState.currentTeam = order[(order.indexOf(gameState.currentTeam)+1)%3];
+            }
+
+            syncGameState();
+            checkGameEnd();
+        };
+
+        const checkGameEnd = () => {
+            if(gameState.members.every(m=>!m.available)){
+                gameState.gameStarted=false;
+                syncGameState();
+                alert('チーム編成が完了しました！');
+            }
+        };
+
+        // ======= 9) ゲーム開始／リセット =======
+        const startGame = () => {
+            if(gameState.gameStarted) return;
+            if(gameState.members.length < 6){alert('最低6名のメンバーが必要です');return;}
+            gameState = {...gameState, ...initialGameState(), members:[...gameState.members]}; // メンバー保持
+            gameState.gameStarted = true;
+            syncGameState();
+        };
+
+        const resetGame = () => {
+            if(!confirm('本当にリセットしますか？')) return;
+            gameState = initialGameState();
+            syncGameState();
+        };
+
+        // =======10) Firebase 同期 =======
+        const syncGameState = () => {
+            if(currentRoom) db.ref(`rooms/${currentRoom}/gameState`).set(gameState);
+        };
+
+        // =======11) 表示更新 =======
+        const updateDisplay = () => {
+            updateAvailableMembers();
+            updateTeamDisplay();
+            updateTurnIndicator();
+            updateTeamHighlight();
+            updateStartButton();
+        };
+
+        const updateAvailableMembers = () => {
+            const container = qs('#availableMembers');
+            const available = gameState.members.filter(m=>m.available);
+            if(!currentRoom){container.innerHTML='<div class="empty-state">ルームに参加してください</div>';return;}
+            if(!available.length){container.innerHTML='<div class="empty-state">控えメンバーがいません</div>';return;}
+            container.innerHTML = available.map(m=>`<div class="member-item ${canSelectMember()?'selectable':''}" onclick="selectMember('${m.name}')">${m.name} ${canSelectMember()?'<span style=\"font-size:.7rem;color:#28a745\">選択</span>':''}</div>`).join('');
+        };
+
+        const updateTeamDisplay = () => {
+            ['A','B','C'].forEach(t=>{
+                const listEl = qs(`#team${t}Members`);
+                const members = gameState.teams[t];
+                if(!members.length){listEl.innerHTML='<div class="empty-state">メンバーなし</div>';return;}
+                listEl.innerHTML = members.map((name,i)=>`<div class="team-member">${i===0?'👑 ':''}${name}${i===0?' (代表)':''}</div>`).join('');
+            });
+        };
+        const updateTurnIndicator = () => {
+            const txt = qs('#turnText');
+            if(!currentRoom){txt.textContent='ルームに参加してください';return;}
+            if(!gameState.gameStarted){txt.textContent='ゲーム開始を待っています';return;}
+            txt.textContent = gameState.isSelectingLeaders ? `代表者選択 - チーム${gameState.currentTeam}` : `チーム${gameState.currentTeam} の順番です`;
+        };
+        const updateTeamHighlight = () => {
+            ['A','B','C'].forEach(t=>{
+                const el = qs(`#team${t}`);
+                if(gameState.gameStarted && t===gameState.currentTeam && canSelectMember()) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+        };
+        const updateStartButton = () => {
+            const btn = qs('#startGameBtn');
+            if(!currentRoom){btn.disabled=true;btn.textContent='ルームに参加してください';return;}
+            if(gameState.gameStarted){btn.disabled=true;btn.textContent='ゲーム進行中';return;}
+            btn.disabled = gameState.members.length < 6;
+            btn.textContent = gameState.members.length < 6 ? `ゲーム開始 (${gameState.members.length}/6)` : 'ゲーム開始';
+        };
+
+        // =======12) ページロード後 =======
+        window.addEventListener('load',()=>{
+            if(initFirebase()){
+                // 接続できた
+            }
+        });
+    </script>
+</body>
+</html>

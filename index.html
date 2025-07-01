@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3チーム作成システム</title>
+    <title>3チーム作成システム（マルチブラウザ対応）</title>
     <style>
         * {
             margin: 0;
@@ -39,9 +39,50 @@
             margin-bottom: 8px;
         }
 
-        .header p {
-            font-size: 0.9em;
-            opacity: 0.9;
+        .connection-status {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+            padding: 12px;
+            margin: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .connection-status.disconnected {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        .connection-status.connecting {
+            background: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+
+        .room-setup {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px;
+            text-align: center;
+        }
+
+        .room-setup h3 {
+            color: #1976d2;
+            margin-bottom: 12px;
+            font-size: 1.1em;
+        }
+
+        .room-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
         }
 
         .content {
@@ -81,7 +122,7 @@
             border-radius: 8px;
             font-size: 16px;
             transition: border-color 0.3s;
-            min-height: 48px; /* タッチしやすい最小サイズ */
+            min-height: 48px;
         }
 
         input[type="text"]:focus {
@@ -99,17 +140,13 @@
             font-size: 16px;
             font-weight: bold;
             transition: transform 0.2s, box-shadow 0.2s;
-            min-height: 48px; /* タッチしやすい最小サイズ */
+            min-height: 48px;
             white-space: nowrap;
         }
 
         button:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-
-        button:active {
-            transform: translateY(0px);
         }
 
         button:disabled {
@@ -151,7 +188,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            min-height: 50px; /* タッチしやすいサイズ */
+            min-height: 50px;
             font-size: 15px;
         }
 
@@ -164,10 +201,6 @@
         .member-item.selectable {
             border-color: #28a745;
             background: #d4edda;
-        }
-
-        .member-item.selectable:active {
-            background: #c3e6cb;
         }
 
         .teams-container {
@@ -276,21 +309,56 @@
             font-size: 14px;
         }
 
-        .save-status {
-            background: #d1ecf1;
-            border: 1px solid #bee5eb;
-            color: #0c5460;
-            padding: 8px 12px;
-            border-radius: 6px;
+        .online-users {
+            background: #f0f8ff;
+            border: 2px solid #87ceeb;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px;
+        }
+
+        .online-users h4 {
+            color: #4682b4;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .user-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .user-badge {
+            background: #87ceeb;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
             font-size: 12px;
-            text-align: center;
+        }
+
+        .setup-instructions {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px;
+        }
+
+        .setup-instructions h3 {
+            color: #856404;
             margin-bottom: 15px;
         }
 
-        .save-status.error {
-            background: #f8d7da;
-            border-color: #f5c6cb;
-            color: #721c24;
+        .setup-instructions ol {
+            color: #856404;
+            line-height: 1.6;
+            margin-left: 20px;
+        }
+
+        .setup-instructions a {
+            color: #0066cc;
+            text-decoration: none;
         }
 
         /* タブレット用レスポンシブ */
@@ -331,21 +399,9 @@
                 flex-direction: row;
                 justify-content: center;
             }
-        }
-
-        /* デスクトップ用 */
-        @media (min-width: 1024px) {
-            .header h1 {
-                font-size: 2.5em;
-            }
             
-            .section h2 {
-                font-size: 1.5em;
-            }
-            
-            .team {
-                min-height: 300px;
-                padding: 20px;
+            .room-controls {
+                flex-direction: row;
             }
         }
 
@@ -355,22 +411,6 @@
                 padding: 5px;
             }
             
-            .header {
-                padding: 15px 10px;
-            }
-            
-            .header h1 {
-                font-size: 1.5em;
-            }
-            
-            .content {
-                padding: 12px;
-            }
-            
-            .member-registration {
-                padding: 15px;
-            }
-            
             .form-group {
                 flex-direction: column;
                 gap: 8px;
@@ -378,38 +418,10 @@
             
             button {
                 width: 100%;
-                padding: 16px;
             }
             
-            .member-item {
-                padding: 14px 10px;
-                font-size: 14px;
-            }
-            
-            .team {
-                padding: 12px;
-                min-height: 180px;
-            }
-            
-            .team h3 {
-                font-size: 1.1em;
-                padding: 10px;
-            }
-        }
-
-        /* ダークモード対応 */
-        @media (prefers-color-scheme: dark) {
-            .member-item, .team-member, .team h3 {
-                background: #f8f9fa;
-            }
-        }
-
-        /* アニメーション改善 */
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
+            .room-controls {
+                flex-direction: column;
             }
         }
     </style>
@@ -418,22 +430,53 @@
     <div class="container">
         <div class="header">
             <h1>🏆 3チーム作成システム</h1>
-            <p>代表者から始まる順番選択でチームを作ろう！</p>
+            <p>複数ブラウザでリアルタイム共有！</p>
+        </div>
+
+        <!-- Firebase設定確認 -->
+        <div id="setupInstructions" class="setup-instructions">
+            <h3>🔧 初期設定が必要です</h3>
+            <p><strong>Firebase設定を完了してください：</strong></p>
+            <ol>
+                <li><a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a> でプロジェクト作成</li>
+                <li>Realtime Database を作成（テストモード）</li>
+                <li>設定情報をコード内の firebaseConfig に貼り付け</li>
+            </ol>
+            <p style="margin-top: 10px; font-size: 14px;">詳しい手順は前のガイドを参照してください</p>
+        </div>
+
+        <!-- 接続状態 -->
+        <div id="connectionStatus" class="connection-status disconnected">
+            🔴 Firebase に接続していません
+        </div>
+
+        <!-- ルーム設定 -->
+        <div class="room-setup">
+            <h3>🏠 ルーム設定</h3>
+            <div class="room-controls">
+                <input type="text" id="roomInput" placeholder="ルーム名を入力" maxlength="20">
+                <button onclick="joinRoom()">ルーム参加</button>
+                <button onclick="createRandomRoom()">ランダムルーム作成</button>
+            </div>
+            <p style="margin-top: 12px; color: #666; font-size: 13px;">
+                同じルーム名で参加すると、リアルタイムで同期されます
+            </p>
+        </div>
+
+        <!-- オンラインユーザー -->
+        <div id="onlineUsers" class="online-users" style="display: none;">
+            <h4>👥 オンライン参加者 (<span id="userCount">0</span>人)</h4>
+            <div id="userList" class="user-list"></div>
         </div>
 
         <div class="content">
-            <!-- 保存状態表示 -->
-            <div id="saveStatus" class="save-status">
-                💾 データは自動保存されます
-            </div>
-
             <!-- メンバー登録セクション -->
             <div class="section">
                 <h2>👥 メンバー登録</h2>
                 <div class="member-registration">
                     <div class="form-group">
-                        <input type="text" id="memberName" placeholder="メンバー名を入力してください" maxlength="20">
-                        <button onclick="addMember()">追加</button>
+                        <input type="text" id="memberName" placeholder="メンバー名を入力してください" maxlength="20" disabled>
+                        <button onclick="addMember()" disabled>追加</button>
                     </div>
                     <p style="color: #666; font-size: 14px;">※ 最初に追加する3名が各チームの代表者になります</p>
                 </div>
@@ -441,13 +484,13 @@
 
             <!-- ゲーム開始ボタン -->
             <div class="game-controls">
-                <button id="startGameBtn" onclick="startGame()" disabled>ゲーム開始</button>
-                <button class="reset-btn" onclick="resetGame()">完全リセット</button>
+                <button id="startGameBtn" onclick="startGame()" disabled>ルームに参加してください</button>
+                <button class="reset-btn" onclick="resetGame()" disabled>完全リセット</button>
             </div>
 
             <!-- ターン表示 -->
             <div id="turnIndicator" class="turn-indicator" style="display: none;">
-                <h3 id="turnText">ゲーム開始前</h3>
+                <h3 id="turnText">ルームに参加してください</h3>
             </div>
 
             <!-- ゲームエリア -->
@@ -456,7 +499,7 @@
                 <div class="available-members">
                     <h3>📋 控えメンバー</h3>
                     <div id="availableMembers">
-                        <div class="empty-state">メンバーを登録してください</div>
+                        <div class="empty-state">ルームに参加してください</div>
                     </div>
                 </div>
 
@@ -479,8 +522,25 @@
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+
     <script>
-        // ゲーム状態管理
+        // 🔥 Firebase設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyB-HT4VYpBA8PMFtwMOJVHRRkMyMoTT6k",
+            authDomain: "team-draft-app.firebaseapp.com",
+            databaseURL: "https://team-draft-app-de-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "team-draft-app",
+            storageBucket: "team-draft-app.firebasestorage.app",
+            messagingSenderId: "865072849567",
+            appId: "1:865072849567:web:878f3c25f8679009l4b8aa",
+            measurementId: "G-TF725SNTDR"
+        };
+
+        // Firebase初期化
+        let app, database, currentRoom = null;
         let gameState = {
             members: [],
             teams: { A: [], B: [], C: [] },
@@ -489,72 +549,135 @@
             isSelectingLeaders: true,
             leaderSelected: { A: false, B: false, C: false }
         };
+        let connectedUsers = {};
+        let userId = 'user_' + Math.random().toString(36).substr(2, 9);
 
-        // ローカルストレージのキー
-        const STORAGE_KEY = 'teamDraftGameState';
+        // Firebase初期化を試行
+        function initFirebase() {
+            if (Object.keys(firebaseConfig).length === 0 || !firebaseConfig.apiKey) {
+                updateConnectionStatus('disconnected', '⚠️ Firebase設定が必要です');
+                return false;
+            }
 
-        // データ保存
-        function saveGameState() {
             try {
-                const data = {
-                    ...gameState,
-                    lastSaved: new Date().toISOString()
-                };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-                updateSaveStatus('success', '💾 データを保存しました');
+                app = firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                updateConnectionStatus('connected', '🟢 Firebase に接続しました');
+                document.getElementById('setupInstructions').style.display = 'none';
+                return true;
             } catch (error) {
-                console.error('保存エラー:', error);
-                updateSaveStatus('error', '❌ 保存に失敗しました');
+                console.error('Firebase初期化エラー:', error);
+                updateConnectionStatus('disconnected', '❌ Firebase接続エラー: ' + error.message);
+                return false;
             }
         }
 
-        // データ読み込み
-        function loadGameState() {
-            try {
-                const savedData = localStorage.getItem(STORAGE_KEY);
-                if (savedData) {
-                    const data = JSON.parse(savedData);
-                    
-                    // バージョン互換性チェック
-                    if (data.members && data.teams) {
-                        gameState = {
-                            members: data.members || [],
-                            teams: data.teams || { A: [], B: [], C: [] },
-                            gameStarted: data.gameStarted || false,
-                            currentTeam: data.currentTeam || 'A',
-                            isSelectingLeaders: data.isSelectingLeaders !== undefined ? data.isSelectingLeaders : true,
-                            leaderSelected: data.leaderSelected || { A: false, B: false, C: false }
-                        };
-                        
-                        const lastSaved = data.lastSaved ? new Date(data.lastSaved).toLocaleString() : '不明';
-                        updateSaveStatus('success', `📂 前回のデータを復元 (${lastSaved})`);
-                        return true;
-                    }
-                }
-            } catch (error) {
-                console.error('読み込みエラー:', error);
-                updateSaveStatus('error', '❌ データの読み込みに失敗しました');
-            }
-            return false;
-        }
-
-        // 保存状態表示更新
-        function updateSaveStatus(type, message) {
-            const statusElement = document.getElementById('saveStatus');
+        // 接続状態更新
+        function updateConnectionStatus(status, message) {
+            const statusElement = document.getElementById('connectionStatus');
             statusElement.textContent = message;
-            statusElement.className = type === 'error' ? 'save-status error' : 'save-status';
+            statusElement.className = `connection-status ${status}`;
+        }
+
+        // ランダムルーム作成
+        function createRandomRoom() {
+            const randomId = Math.random().toString(36).substr(2, 8);
+            const roomName = `room_${randomId}`;
+            document.getElementById('roomInput').value = roomName;
+            joinRoom(roomName);
+        }
+
+        // ルーム参加
+        function joinRoom(roomName) {
+            if (!database) {
+                alert('Firebase に接続されていません');
+                return;
+            }
+
+            roomName = roomName || document.getElementById('roomInput').value.trim();
+            if (!roomName) {
+                alert('ルーム名を入力してください');
+                return;
+            }
+
+            // 既存の接続をクリーンアップ
+            if (currentRoom) {
+                database.ref(`rooms/${currentRoom}`).off();
+            }
+
+            currentRoom = roomName;
+            updateConnectionStatus('connecting', '🟡 ルームに接続中...');
             
-            // 3秒後にデフォルトメッセージに戻す
-            setTimeout(() => {
-                if (statusElement.textContent === message) {
-                    statusElement.textContent = '💾 データは自動保存されます';
-                    statusElement.className = 'save-status';
+            // ルームデータを監視
+            database.ref(`rooms/${currentRoom}/gameState`).on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    gameState = data;
+                    updateDisplay();
                 }
-            }, 3000);
+            });
+
+            // ユーザー一覧を監視
+            database.ref(`rooms/${currentRoom}/users`).on('value', (snapshot) => {
+                connectedUsers = snapshot.val() || {};
+                updateOnlineUsers();
+            });
+
+            // 自分の存在を記録
+            database.ref(`rooms/${currentRoom}/users/${userId}`).set({
+                joinedAt: firebase.database.ServerValue.TIMESTAMP
+            });
+
+            // 接続切断時の処理
+            database.ref(`rooms/${currentRoom}/users/${userId}`).onDisconnect().remove();
+
+            // UI有効化
+            enableUI();
+            updateConnectionStatus('connected', `🟢 ルーム "${roomName}" に参加中`);
+            document.getElementById('turnIndicator').style.display = 'block';
+            updateDisplay();
+        }
+
+        // UI有効化
+        function enableUI() {
+            document.getElementById('memberName').disabled = false;
+            document.querySelector('button[onclick="addMember()"]').disabled = false;
+            document.querySelector('button[onclick="resetGame()"]').disabled = false;
+        }
+
+        // オンラインユーザー表示更新
+        function updateOnlineUsers() {
+            const container = document.getElementById('onlineUsers');
+            const userList = document.getElementById('userList');
+            const userCount = document.getElementById('userCount');
+            
+            const users = Object.keys(connectedUsers);
+            userCount.textContent = users.length;
+            
+            if (users.length > 0) {
+                container.style.display = 'block';
+                userList.innerHTML = users.map(uid => 
+                    `<span class="user-badge">${uid}</span>`
+                ).join('');
+            } else {
+                container.style.display = 'none';
+            }
+        }
+
+        // ゲーム状態をFirebaseに同期
+        function syncGameState() {
+            if (database && currentRoom) {
+                database.ref(`rooms/${currentRoom}/gameState`).set(gameState);
+            }
         }
 
         // メンバー追加
         function addMember() {
+            if (!currentRoom) {
+                alert('ルームに参加してください');
+                return;
+            }
+
             const nameInput = document.getElementById('memberName');
             const name = nameInput.value.trim();
             
@@ -571,40 +694,7 @@
             gameState.members.push({ name: name, available: true });
             nameInput.value = '';
             
-            saveGameState();
-            updateDisplay();
-        }
-
-        // 利用可能メンバー表示更新
-        function updateAvailableMembers() {
-            const container = document.getElementById('availableMembers');
-            const availableMembers = gameState.members.filter(member => member.available);
-            
-            if (availableMembers.length === 0) {
-                container.innerHTML = '<div class="empty-state">控えメンバーがいません</div>';
-                return;
-            }
-            
-            container.innerHTML = availableMembers.map(member => `
-                <div class="member-item ${canSelectMember() ? 'selectable' : ''}" 
-                     onclick="selectMember('${member.name}')" 
-                     data-name="${member.name}">
-                    <span>${member.name}</span>
-                    ${canSelectMember() ? '<span style="color: #28a745; font-size: 12px;">👆 タップ</span>' : ''}
-                </div>
-            `).join('');
-        }
-
-        // メンバー選択可能かチェック
-        function canSelectMember() {
-            if (!gameState.gameStarted) return false;
-            
-            if (gameState.isSelectingLeaders) {
-                return !gameState.leaderSelected[gameState.currentTeam];
-            } else {
-                return gameState.teams[gameState.currentTeam].length > 0 && 
-                       gameState.members.some(m => m.available);
-            }
+            syncGameState();
         }
 
         // メンバー選択
@@ -637,12 +727,11 @@
                 moveToNextTeam();
             }
             
-            saveGameState();
-            updateDisplay();
+            syncGameState();
             checkGameEnd();
         }
 
-        // 次のチームに選択権を移す
+        // 次のチームに移動
         function moveToNextTeam() {
             const teamOrder = ['A', 'B', 'C'];
             let nextTeamIndex = (teamOrder.indexOf(gameState.currentTeam) + 1) % 3;
@@ -659,157 +748,10 @@
             }
         }
 
-        // 表示更新
-        function updateDisplay() {
-            updateAvailableMembers();
-            updateTeamDisplay();
-            updateTurnIndicator();
-            updateTeamHighlight();
-            updateStartButton();
-        }
-
-        // チーム表示更新
-        function updateTeamDisplay() {
-            ['A', 'B', 'C'].forEach(teamName => {
-                const container = document.getElementById(`team${teamName}Members`);
-                const teamMembers = gameState.teams[teamName];
-                
-                if (teamMembers.length === 0) {
-                    container.innerHTML = '<div class="empty-state">メンバーなし</div>';
-                } else {
-                    container.innerHTML = teamMembers.map((member, index) => `
-                        <div class="team-member">
-                            ${index === 0 ? '👑 ' : ''}${member}
-                            ${index === 0 ? ' (代表)' : ''}
-                        </div>
-                    `).join('');
-                }
-            });
-        }
-
-        // ターン表示更新
-        function updateTurnIndicator() {
-            const indicator = document.getElementById('turnIndicator');
-            const turnText = document.getElementById('turnText');
-            
-            if (!gameState.gameStarted) {
-                indicator.style.display = 'none';
-                return;
-            }
-            
-            indicator.style.display = 'block';
+        // 選択可能かチェック
+        function canSelectMember() {
+            if (!gameState.gameStarted || !currentRoom) return false;
             
             if (gameState.isSelectingLeaders) {
-                turnText.textContent = `代表者選択中 - チーム${gameState.currentTeam}の代表者を選んでください`;
-            } else {
-                turnText.textContent = `チーム${gameState.currentTeam}の選択順番です`;
-            }
-        }
-
-        // チームハイライト更新
-        function updateTeamHighlight() {
-            ['A', 'B', 'C'].forEach(teamName => {
-                const teamElement = document.getElementById(`team${teamName}`);
-                if (gameState.gameStarted && teamName === gameState.currentTeam && canSelectMember()) {
-                    teamElement.classList.add('active');
-                } else {
-                    teamElement.classList.remove('active');
-                }
-            });
-        }
-
-        // ゲーム開始ボタン状態更新
-        function updateStartButton() {
-            const startBtn = document.getElementById('startGameBtn');
-            const memberCount = gameState.members.length;
+                return !gameState.leaderSelected[gameState.currentTeam];
             
-            startBtn.disabled = memberCount < 6 || gameState.gameStarted;
-            
-            if (memberCount < 6) {
-                startBtn.textContent = `ゲーム開始 (${memberCount}/6人以上必要)`;
-            } else if (gameState.gameStarted) {
-                startBtn.textContent = 'ゲーム進行中';
-            } else {
-                startBtn.textContent = 'ゲーム開始';
-            }
-        }
-
-        // ゲーム開始
-        function startGame() {
-            if (gameState.members.length < 6) {
-                alert('最低6名のメンバーが必要です');
-                return;
-            }
-            
-            gameState.gameStarted = true;
-            gameState.isSelectingLeaders = true;
-            gameState.currentTeam = 'A';
-            gameState.leaderSelected = { A: false, B: false, C: false };
-            
-            saveGameState();
-            updateDisplay();
-        }
-
-        // ゲーム終了チェック
-        function checkGameEnd() {
-            const availableCount = gameState.members.filter(m => m.available).length;
-            if (availableCount === 0) {
-                setTimeout(() => {
-                    alert('🎉 チーム作成完了！\n\n' + 
-                          `チームA: ${gameState.teams.A.join(', ')}\n` +
-                          `チームB: ${gameState.teams.B.join(', ')}\n` +
-                          `チームC: ${gameState.teams.C.join(', ')}`);
-                }, 500);
-            }
-        }
-
-        // ゲームリセット
-        function resetGame() {
-            if (confirm('🗑️ すべてのデータを完全にリセットしますか？\n\n' +
-                       '※ この操作は取り消せません')) {
-                gameState = {
-                    members: [],
-                    teams: { A: [], B: [], C: [] },
-                    gameStarted: false,
-                    currentTeam: 'A',
-                    isSelectingLeaders: true,
-                    leaderSelected: { A: false, B: false, C: false }
-                };
-                
-                // ローカルストレージからも削除
-                localStorage.removeItem(STORAGE_KEY);
-                updateSaveStatus('success', '🗑️ データをリセットしました');
-                
-                updateDisplay();
-            }
-        }
-
-        // エンターキーでメンバー追加
-        document.getElementById('memberName').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                addMember();
-            }
-        });
-
-        // タッチイベントの改善（iOS Safari対応）
-        document.addEventListener('touchstart', function() {}, {passive: true});
-
-        // ページロード時にデータを復元
-        window.addEventListener('load', function() {
-            loadGameState();
-            updateDisplay();
-        });
-
-        // ページ離脱前に確認（ゲーム進行中のみ）
-        window.addEventListener('beforeunload', function(e) {
-            if (gameState.gameStarted && gameState.members.some(m => m.available)) {
-                e.preventDefault();
-                e.returnValue = 'ゲームが進行中です。本当にページを離れますか？';
-            }
-        });
-
-        // 初期表示
-        updateDisplay();
-    </script>
-</body>
-</html>

@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3チーム作成システム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 3px solid #4facfe;
+            padding-bottom: 10px;
+        }
+
+        .member-registration {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+
+        .form-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+
+        button {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .game-area {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .available-members {
+            background: #fff3cd;
+            border: 2px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .available-members h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .member-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .member-item:hover {
+            border-color: #4facfe;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .member-item.selectable {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .teams-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .team {
+            border: 3px solid;
+            border-radius: 15px;
+            padding: 20px;
+            min-height: 300px;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .team-a {
+            border-color: #ff6b6b;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        }
+
+        .team-b {
+            border-color: #4ecdc4;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        }
+
+        .team-c {
+            border-color: #45b7d1;
+            background: linear-gradient(135deg, #96deda 0%, #50c9c3 100%);
+        }
+
+        .team.active {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .team h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            color: #333;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .team-member {
+            background: white;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid;
+        }
+
+        .team-a .team-member {
+            border-left-color: #ff6b6b;
+        }
+
+        .team-b .team-member {
+            border-left-color: #4ecdc4;
+        }
+
+        .team-c .team-member {
+            border-left-color: #45b7d1;
+        }
+
+        .turn-indicator {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .turn-indicator h3 {
+            color: #1976d2;
+            font-size: 1.2em;
+        }
+
+        .game-controls {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .reset-btn {
+            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+            padding: 15px 30px;
+            font-size: 18px;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .game-area {
+                grid-template-columns: 1fr;
+            }
+            
+            .teams-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏆 3チーム作成システム</h1>
+            <p>代表者から始まる順番選択でチームを作ろう！</p>
+        </div>
+
+        <div class="content">
+            <!-- メンバー登録セクション -->
+            <div class="section">
+                <h2>👥 メンバー登録</h2>
+                <div class="member-registration">
+                    <div class="form-group">
+                        <input type="text" id="memberName" placeholder="メンバー名を入力してください" maxlength="20">
+                        <button onclick="addMember()">メンバー追加</button>
+                    </div>
+                    <p style="color: #666; font-size: 14px;">※ 最初に追加する3名が各チームの代表者になります</p>
+                </div>
+            </div>
+
+            <!-- ゲーム開始ボタン -->
+            <div class="game-controls">
+                <button id="startGameBtn" onclick="startGame()" disabled>ゲーム開始</button>
+                <button class="reset-btn" onclick="resetGame()">リセット</button>
+            </div>
+
+            <!-- ターン表示 -->
+            <div id="turnIndicator" class="turn-indicator" style="display: none;">
+                <h3 id="turnText">ゲーム開始前</h3>
+            </div>
+
+            <!-- ゲームエリア -->
+            <div class="game-area">
+                <!-- 控えメンバー -->
+                <div class="available-members">
+                    <h3>📋 控えメンバー</h3>
+                    <div id="availableMembers">
+                        <div class="empty-state">メンバーを登録してください</div>
+                    </div>
+                </div>
+
+                <!-- チーム表示 -->
+                <div class="teams-container">
+                    <div class="team team-a" id="teamA">
+                        <h3>🔴 チームA</h3>
+                        <div id="teamAMembers"></div>
+                    </div>
+                    <div class="team team-b" id="teamB">
+                        <h3>🟢 チームB</h3>
+                        <div id="teamBMembers"></div>
+                    </div>
+                    <div class="team team-c" id="teamC">
+                        <h3>🔵 チームC</h3>
+                        <div id="teamCMembers"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ゲーム状態管理
+        let members = [];
+        let teams = { A: [], B: [], C: [] };
+        let gameStarted = false;
+        let currentTeam = 'A'; // A, B, C
+        let isSelectingLeaders = true;
+        let leaderSelected = { A: false, B: false, C: false };
+
+        // メンバー追加
+        function addMember() {
+            const nameInput = document.getElementById('memberName');
+            const name = nameInput.value.trim();
+            
+            if (name === '') {
+                alert('メンバー名を入力してください');
+                return;
+            }
+            
+            if (members.some(member => member.name === name)) {
+                alert('同じ名前のメンバーが既に登録されています');
+                return;
+            }
+            
+            members.push({ name: name, available: true });
+            nameInput.value = '';
+            
+            updateAvailableMembers();
+            updateStartButton();
+        }
+
+        // 利用可能メンバー表示更新
+        function updateAvailableMembers() {
+            const container = document.getElementById('availableMembers');
+            const availableMembers = members.filter(member => member.available);
+            
+            if (availableMembers.length === 0) {
+                container.innerHTML = '<div class="empty-state">控えメンバーがいません</div>';
+                return;
+            }
+            
+            container.innerHTML = availableMembers.map(member => `
+                <div class="member-item ${canSelectMember() ? 'selectable' : ''}" 
+                     onclick="selectMember('${member.name}')" 
+                     data-name="${member.name}">
+                    <span>${member.name}</span>
+                    ${canSelectMember() ? '<span style="color: #28a745;">選択可能</span>' : ''}
+                </div>
+            `).join('');
+        }
+
+        // メンバー選択可能かチェック
+        function canSelectMember() {
+            if (!gameStarted) return false;
+            
+            if (isSelectingLeaders) {
+                return !leaderSelected[currentTeam];
+            } else {
+                // 現在のチームにメンバーがいて、まだ選択権があるか
+                return teams[currentTeam].length > 0 && members.some(m => m.available);
+            }
+        }
+
+        // メンバー選択
+        function selectMember(memberName) {
+            if (!canSelectMember()) {
+                alert('現在選択できません');
+                return;
+            }
+            
+            // メンバーをチームに追加
+            const memberIndex = members.findIndex(m => m.name === memberName);
+            if (memberIndex === -1 || !members[memberIndex].available) return;
+            
+            members[memberIndex].available = false;
+            teams[currentTeam].push(memberName);
+            
+            if (isSelectingLeaders) {
+                leaderSelected[currentTeam] = true;
+                
+                // 次のチームの代表者選択へ
+                if (!leaderSelected.A) {
+                    currentTeam = 'A';
+                } else if (!leaderSelected.B) {
+                    currentTeam = 'B';
+                } else if (!leaderSelected.C) {
+                    currentTeam = 'C';
+                } else {
+                    // 全代表者選択完了、通常選択フェーズへ
+                    isSelectingLeaders = false;
+                    currentTeam = 'A';
+                }
+            } else {
+                // 次のチームへ順番を移す
+                moveToNextTeam();
+            }
+            
+            updateDisplay();
+            checkGameEnd();
+        }
+
+        // 次のチームに選択権を移す
+        function moveToNextTeam() {
+            const teamOrder = ['A', 'B', 'C'];
+            let nextTeamIndex = (teamOrder.indexOf(currentTeam) + 1) % 3;
+            let attempts = 0;
+            
+            // 次に選択権を持つチームを見つける（メンバーがいるチーム）
+            while (attempts < 3) {
+                const nextTeam = teamOrder[nextTeamIndex];
+                if (teams[nextTeam].length > 0) {
+                    currentTeam = nextTeam;
+                    break;
+                }
+                nextTeamIndex = (nextTeamIndex + 1) % 3;
+                attempts++;
+            }
+        }
+
+        // 表示更新
+        function updateDisplay() {
+            updateAvailableMembers();
+            updateTeamDisplay();
+            updateTurnIndicator();
+            updateTeamHighlight();
+        }
+
+        // チーム表示更新
+        function updateTeamDisplay() {
+            ['A', 'B', 'C'].forEach(teamName => {
+                const container = document.getElementById(`team${teamName}Members`);
+                const teamMembers = teams[teamName];
+                
+                if (teamMembers.length === 0) {
+                    container.innerHTML = '<div class="empty-state">メンバーなし</div>';
+                } else {
+                    container.innerHTML = teamMembers.map((member, index) => `
+                        <div class="team-member">
+                            ${index === 0 ? '👑 ' : ''}${member}
+                            ${index === 0 ? ' (代表)' : ''}
+                        </div>
+                    `).join('');
+                }
+            });
+        }
+
+        // ターン表示更新
+        function updateTurnIndicator() {
+            const indicator = document.getElementById('turnIndicator');
+            const turnText = document.getElementById('turnText');
+            
+            if (!gameStarted) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            indicator.style.display = 'block';
+            
+            if (isSelectingLeaders) {
+                turnText.textContent = `代表者選択中 - チーム${currentTeam}の代表者を選んでください`;
+            } else {
+                turnText.textContent = `チーム${currentTeam}の選択順番です`;
+            }
+        }
+
+        // チームハイライト更新
+        function updateTeamHighlight() {
+            ['A', 'B', 'C'].forEach(teamName => {
+                const teamElement = document.getElementById(`team${teamName}`);
+                if (gameStarted && teamName === currentTeam && canSelectMember()) {
+                    teamElement.classList.add('active');
+                } else {
+                    teamElement.classList.remove('active');
+                }
+            });
+        }
+
+        // ゲーム開始ボタン状態更新
+        function updateStartButton() {
+            const startBtn = document.getElementById('startGameBtn');
+            startBtn.disabled = members.length < 6 || gameStarted;
+            
+            if (members.length < 6) {
+                startBtn.textContent = `ゲーム開始 (${members.length}/6人以上必要)`;
+            } else if (gameStarted) {
+                startBtn.textContent = 'ゲーム進行中';
+            } else {
+                startBtn.textContent = 'ゲーム開始';
+            }
+        }
+
+        // ゲーム開始
+        function startGame() {
+            if (members.length < 6) {
+                alert('最低6名のメンバーが必要です');
+                return;
+            }
+            
+            gameStarted = true;
+            isSelectingLeaders = true;
+            currentTeam = 'A';
+            leaderSelected = { A: false, B: false, C: false };
+            
+            updateDisplay();
+            updateStartButton();
+        }
+
+        // ゲーム終了チェック
+        function checkGameEnd() {
+            const availableCount = members.filter(m => m.available).length;
+            if (availableCount === 0) {
+                setTimeout(() => {
+                    alert('🎉 チーム作成完了！\n\n' + 
+                          `チームA: ${teams.A.join(', ')}\n` +
+                          `チームB: ${teams.B.join(', ')}\n` +
+                          `チームC: ${teams.C.join(', ')}`);
+                }, 500);
+            }
+        }
+
+        // ゲームリセット
+        function resetGame() {
+            if (confirm('ゲームをリセットしますか？すべてのデータが削除されます。')) {
+                members = [];
+                teams = { A: [], B: [], C: [] };
+                gameStarted = false;
+                currentTeam = 'A';
+                isSelectingLeaders = true;
+                leaderSelected = { A: false, B: false, C: false };
+                
+                updateDisplay();
+                updateStartButton();
+            }
+        }
+
+        // エンターキーでメンバー追加
+        document.getElementById('memberName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addMember();
+            }
+        });
+
+        // 初期表示
+        updateDisplay();
+        updateStartButton();
+    </script>
+</body>
+</html>

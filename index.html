@@ -15,7 +15,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 20px;
+            padding: 10px;
         }
 
         .container {
@@ -30,52 +30,58 @@
         .header {
             background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
             color: white;
-            padding: 30px;
+            padding: 20px 15px;
             text-align: center;
         }
 
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            font-size: 1.8em;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 0.9em;
+            opacity: 0.9;
         }
 
         .content {
-            padding: 30px;
+            padding: 15px;
         }
 
         .section {
-            margin-bottom: 40px;
+            margin-bottom: 25px;
         }
 
         .section h2 {
             color: #333;
-            margin-bottom: 20px;
-            font-size: 1.5em;
+            margin-bottom: 15px;
+            font-size: 1.3em;
             border-bottom: 3px solid #4facfe;
-            padding-bottom: 10px;
+            padding-bottom: 8px;
         }
 
         .member-registration {
             background: #f8f9fa;
-            padding: 25px;
+            padding: 20px;
             border-radius: 10px;
             border: 2px solid #e9ecef;
         }
 
         .form-group {
             display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: stretch;
         }
 
         input[type="text"] {
             flex: 1;
-            padding: 12px 15px;
+            padding: 14px 12px;
             border: 2px solid #ddd;
             border-radius: 8px;
             font-size: 16px;
             transition: border-color 0.3s;
+            min-height: 48px; /* タッチしやすい最小サイズ */
         }
 
         input[type="text"]:focus {
@@ -84,7 +90,7 @@
         }
 
         button {
-            padding: 12px 25px;
+            padding: 12px 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
@@ -93,11 +99,17 @@
             font-size: 16px;
             font-weight: bold;
             transition: transform 0.2s, box-shadow 0.2s;
+            min-height: 48px; /* タッチしやすい最小サイズ */
+            white-space: nowrap;
         }
 
         button:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translateY(0px);
         }
 
         button:disabled {
@@ -109,27 +121,29 @@
 
         .game-area {
             display: grid;
-            grid-template-columns: 1fr 2fr;
-            gap: 30px;
-            margin-top: 30px;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-top: 20px;
         }
 
         .available-members {
             background: #fff3cd;
             border: 2px solid #ffeaa7;
             border-radius: 10px;
-            padding: 20px;
+            padding: 15px;
+            order: 2;
         }
 
         .available-members h3 {
             color: #856404;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
+            font-size: 1.1em;
         }
 
         .member-item {
             background: white;
-            padding: 15px;
-            margin: 10px 0;
+            padding: 16px 12px;
+            margin: 8px 0;
             border-radius: 8px;
             border: 2px solid #ddd;
             cursor: pointer;
@@ -137,12 +151,14 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            min-height: 50px; /* タッチしやすいサイズ */
+            font-size: 15px;
         }
 
         .member-item:hover {
             border-color: #4facfe;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
         }
 
         .member-item.selectable {
@@ -150,17 +166,22 @@
             background: #d4edda;
         }
 
+        .member-item.selectable:active {
+            background: #c3e6cb;
+        }
+
         .teams-container {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            order: 1;
         }
 
         .team {
             border: 3px solid;
             border-radius: 15px;
-            padding: 20px;
-            min-height: 300px;
+            padding: 15px;
+            min-height: 200px;
             position: relative;
             transition: all 0.3s;
         }
@@ -181,28 +202,29 @@
         }
 
         .team.active {
-            transform: scale(1.05);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transform: scale(1.02);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
         }
 
         .team h3 {
             text-align: center;
-            margin-bottom: 20px;
-            font-size: 1.3em;
+            margin-bottom: 15px;
+            font-size: 1.2em;
             color: #333;
             background: white;
-            padding: 10px;
+            padding: 12px 8px;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         .team-member {
             background: white;
             padding: 12px;
-            margin: 8px 0;
+            margin: 6px 0;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
             border-left: 4px solid;
+            font-size: 14px;
         }
 
         .team-a .team-member {
@@ -221,25 +243,29 @@
             background: #e3f2fd;
             border: 2px solid #2196f3;
             border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 15px;
+            margin-bottom: 15px;
             text-align: center;
         }
 
         .turn-indicator h3 {
             color: #1976d2;
-            font-size: 1.2em;
+            font-size: 1.1em;
+            line-height: 1.4;
         }
 
         .game-controls {
             text-align: center;
-            margin: 30px 0;
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .reset-btn {
             background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
-            padding: 15px 30px;
-            font-size: 18px;
+            padding: 14px 25px;
+            font-size: 16px;
         }
 
         .empty-state {
@@ -247,15 +273,143 @@
             color: #666;
             font-style: italic;
             padding: 20px;
+            font-size: 14px;
         }
 
-        @media (max-width: 768px) {
+        .save-status {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .save-status.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        /* タブレット用レスポンシブ */
+        @media (min-width: 768px) {
+            .container {
+                margin: 20px auto;
+            }
+            
+            .header {
+                padding: 30px;
+            }
+            
+            .header h1 {
+                font-size: 2.2em;
+            }
+            
+            .content {
+                padding: 30px;
+            }
+            
             .game-area {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 2fr;
+                gap: 25px;
+            }
+            
+            .available-members {
+                order: 1;
+                padding: 20px;
             }
             
             .teams-container {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 20px;
+                order: 2;
+            }
+            
+            .game-controls {
+                flex-direction: row;
+                justify-content: center;
+            }
+        }
+
+        /* デスクトップ用 */
+        @media (min-width: 1024px) {
+            .header h1 {
+                font-size: 2.5em;
+            }
+            
+            .section h2 {
+                font-size: 1.5em;
+            }
+            
+            .team {
+                min-height: 300px;
+                padding: 20px;
+            }
+        }
+
+        /* 非常に小さな画面用 */
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            
+            .header {
+                padding: 15px 10px;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            .content {
+                padding: 12px;
+            }
+            
+            .member-registration {
+                padding: 15px;
+            }
+            
+            .form-group {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            button {
+                width: 100%;
+                padding: 16px;
+            }
+            
+            .member-item {
+                padding: 14px 10px;
+                font-size: 14px;
+            }
+            
+            .team {
+                padding: 12px;
+                min-height: 180px;
+            }
+            
+            .team h3 {
+                font-size: 1.1em;
+                padding: 10px;
+            }
+        }
+
+        /* ダークモード対応 */
+        @media (prefers-color-scheme: dark) {
+            .member-item, .team-member, .team h3 {
+                background: #f8f9fa;
+            }
+        }
+
+        /* アニメーション改善 */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
             }
         }
     </style>
@@ -268,13 +422,18 @@
         </div>
 
         <div class="content">
+            <!-- 保存状態表示 -->
+            <div id="saveStatus" class="save-status">
+                💾 データは自動保存されます
+            </div>
+
             <!-- メンバー登録セクション -->
             <div class="section">
                 <h2>👥 メンバー登録</h2>
                 <div class="member-registration">
                     <div class="form-group">
                         <input type="text" id="memberName" placeholder="メンバー名を入力してください" maxlength="20">
-                        <button onclick="addMember()">メンバー追加</button>
+                        <button onclick="addMember()">追加</button>
                     </div>
                     <p style="color: #666; font-size: 14px;">※ 最初に追加する3名が各チームの代表者になります</p>
                 </div>
@@ -283,7 +442,7 @@
             <!-- ゲーム開始ボタン -->
             <div class="game-controls">
                 <button id="startGameBtn" onclick="startGame()" disabled>ゲーム開始</button>
-                <button class="reset-btn" onclick="resetGame()">リセット</button>
+                <button class="reset-btn" onclick="resetGame()">完全リセット</button>
             </div>
 
             <!-- ターン表示 -->
@@ -322,12 +481,77 @@
 
     <script>
         // ゲーム状態管理
-        let members = [];
-        let teams = { A: [], B: [], C: [] };
-        let gameStarted = false;
-        let currentTeam = 'A'; // A, B, C
-        let isSelectingLeaders = true;
-        let leaderSelected = { A: false, B: false, C: false };
+        let gameState = {
+            members: [],
+            teams: { A: [], B: [], C: [] },
+            gameStarted: false,
+            currentTeam: 'A',
+            isSelectingLeaders: true,
+            leaderSelected: { A: false, B: false, C: false }
+        };
+
+        // ローカルストレージのキー
+        const STORAGE_KEY = 'teamDraftGameState';
+
+        // データ保存
+        function saveGameState() {
+            try {
+                const data = {
+                    ...gameState,
+                    lastSaved: new Date().toISOString()
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                updateSaveStatus('success', '💾 データを保存しました');
+            } catch (error) {
+                console.error('保存エラー:', error);
+                updateSaveStatus('error', '❌ 保存に失敗しました');
+            }
+        }
+
+        // データ読み込み
+        function loadGameState() {
+            try {
+                const savedData = localStorage.getItem(STORAGE_KEY);
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    
+                    // バージョン互換性チェック
+                    if (data.members && data.teams) {
+                        gameState = {
+                            members: data.members || [],
+                            teams: data.teams || { A: [], B: [], C: [] },
+                            gameStarted: data.gameStarted || false,
+                            currentTeam: data.currentTeam || 'A',
+                            isSelectingLeaders: data.isSelectingLeaders !== undefined ? data.isSelectingLeaders : true,
+                            leaderSelected: data.leaderSelected || { A: false, B: false, C: false }
+                        };
+                        
+                        const lastSaved = data.lastSaved ? new Date(data.lastSaved).toLocaleString() : '不明';
+                        updateSaveStatus('success', `📂 前回のデータを復元 (${lastSaved})`);
+                        return true;
+                    }
+                }
+            } catch (error) {
+                console.error('読み込みエラー:', error);
+                updateSaveStatus('error', '❌ データの読み込みに失敗しました');
+            }
+            return false;
+        }
+
+        // 保存状態表示更新
+        function updateSaveStatus(type, message) {
+            const statusElement = document.getElementById('saveStatus');
+            statusElement.textContent = message;
+            statusElement.className = type === 'error' ? 'save-status error' : 'save-status';
+            
+            // 3秒後にデフォルトメッセージに戻す
+            setTimeout(() => {
+                if (statusElement.textContent === message) {
+                    statusElement.textContent = '💾 データは自動保存されます';
+                    statusElement.className = 'save-status';
+                }
+            }, 3000);
+        }
 
         // メンバー追加
         function addMember() {
@@ -339,22 +563,22 @@
                 return;
             }
             
-            if (members.some(member => member.name === name)) {
+            if (gameState.members.some(member => member.name === name)) {
                 alert('同じ名前のメンバーが既に登録されています');
                 return;
             }
             
-            members.push({ name: name, available: true });
+            gameState.members.push({ name: name, available: true });
             nameInput.value = '';
             
-            updateAvailableMembers();
-            updateStartButton();
+            saveGameState();
+            updateDisplay();
         }
 
         // 利用可能メンバー表示更新
         function updateAvailableMembers() {
             const container = document.getElementById('availableMembers');
-            const availableMembers = members.filter(member => member.available);
+            const availableMembers = gameState.members.filter(member => member.available);
             
             if (availableMembers.length === 0) {
                 container.innerHTML = '<div class="empty-state">控えメンバーがいません</div>';
@@ -366,20 +590,20 @@
                      onclick="selectMember('${member.name}')" 
                      data-name="${member.name}">
                     <span>${member.name}</span>
-                    ${canSelectMember() ? '<span style="color: #28a745;">選択可能</span>' : ''}
+                    ${canSelectMember() ? '<span style="color: #28a745; font-size: 12px;">👆 タップ</span>' : ''}
                 </div>
             `).join('');
         }
 
         // メンバー選択可能かチェック
         function canSelectMember() {
-            if (!gameStarted) return false;
+            if (!gameState.gameStarted) return false;
             
-            if (isSelectingLeaders) {
-                return !leaderSelected[currentTeam];
+            if (gameState.isSelectingLeaders) {
+                return !gameState.leaderSelected[gameState.currentTeam];
             } else {
-                // 現在のチームにメンバーがいて、まだ選択権があるか
-                return teams[currentTeam].length > 0 && members.some(m => m.available);
+                return gameState.teams[gameState.currentTeam].length > 0 && 
+                       gameState.members.some(m => m.available);
             }
         }
 
@@ -390,33 +614,30 @@
                 return;
             }
             
-            // メンバーをチームに追加
-            const memberIndex = members.findIndex(m => m.name === memberName);
-            if (memberIndex === -1 || !members[memberIndex].available) return;
+            const memberIndex = gameState.members.findIndex(m => m.name === memberName);
+            if (memberIndex === -1 || !gameState.members[memberIndex].available) return;
             
-            members[memberIndex].available = false;
-            teams[currentTeam].push(memberName);
+            gameState.members[memberIndex].available = false;
+            gameState.teams[gameState.currentTeam].push(memberName);
             
-            if (isSelectingLeaders) {
-                leaderSelected[currentTeam] = true;
+            if (gameState.isSelectingLeaders) {
+                gameState.leaderSelected[gameState.currentTeam] = true;
                 
-                // 次のチームの代表者選択へ
-                if (!leaderSelected.A) {
-                    currentTeam = 'A';
-                } else if (!leaderSelected.B) {
-                    currentTeam = 'B';
-                } else if (!leaderSelected.C) {
-                    currentTeam = 'C';
+                if (!gameState.leaderSelected.A) {
+                    gameState.currentTeam = 'A';
+                } else if (!gameState.leaderSelected.B) {
+                    gameState.currentTeam = 'B';
+                } else if (!gameState.leaderSelected.C) {
+                    gameState.currentTeam = 'C';
                 } else {
-                    // 全代表者選択完了、通常選択フェーズへ
-                    isSelectingLeaders = false;
-                    currentTeam = 'A';
+                    gameState.isSelectingLeaders = false;
+                    gameState.currentTeam = 'A';
                 }
             } else {
-                // 次のチームへ順番を移す
                 moveToNextTeam();
             }
             
+            saveGameState();
             updateDisplay();
             checkGameEnd();
         }
@@ -424,14 +645,13 @@
         // 次のチームに選択権を移す
         function moveToNextTeam() {
             const teamOrder = ['A', 'B', 'C'];
-            let nextTeamIndex = (teamOrder.indexOf(currentTeam) + 1) % 3;
+            let nextTeamIndex = (teamOrder.indexOf(gameState.currentTeam) + 1) % 3;
             let attempts = 0;
             
-            // 次に選択権を持つチームを見つける（メンバーがいるチーム）
             while (attempts < 3) {
                 const nextTeam = teamOrder[nextTeamIndex];
-                if (teams[nextTeam].length > 0) {
-                    currentTeam = nextTeam;
+                if (gameState.teams[nextTeam].length > 0) {
+                    gameState.currentTeam = nextTeam;
                     break;
                 }
                 nextTeamIndex = (nextTeamIndex + 1) % 3;
@@ -445,13 +665,14 @@
             updateTeamDisplay();
             updateTurnIndicator();
             updateTeamHighlight();
+            updateStartButton();
         }
 
         // チーム表示更新
         function updateTeamDisplay() {
             ['A', 'B', 'C'].forEach(teamName => {
                 const container = document.getElementById(`team${teamName}Members`);
-                const teamMembers = teams[teamName];
+                const teamMembers = gameState.teams[teamName];
                 
                 if (teamMembers.length === 0) {
                     container.innerHTML = '<div class="empty-state">メンバーなし</div>';
@@ -471,17 +692,17 @@
             const indicator = document.getElementById('turnIndicator');
             const turnText = document.getElementById('turnText');
             
-            if (!gameStarted) {
+            if (!gameState.gameStarted) {
                 indicator.style.display = 'none';
                 return;
             }
             
             indicator.style.display = 'block';
             
-            if (isSelectingLeaders) {
-                turnText.textContent = `代表者選択中 - チーム${currentTeam}の代表者を選んでください`;
+            if (gameState.isSelectingLeaders) {
+                turnText.textContent = `代表者選択中 - チーム${gameState.currentTeam}の代表者を選んでください`;
             } else {
-                turnText.textContent = `チーム${currentTeam}の選択順番です`;
+                turnText.textContent = `チーム${gameState.currentTeam}の選択順番です`;
             }
         }
 
@@ -489,7 +710,7 @@
         function updateTeamHighlight() {
             ['A', 'B', 'C'].forEach(teamName => {
                 const teamElement = document.getElementById(`team${teamName}`);
-                if (gameStarted && teamName === currentTeam && canSelectMember()) {
+                if (gameState.gameStarted && teamName === gameState.currentTeam && canSelectMember()) {
                     teamElement.classList.add('active');
                 } else {
                     teamElement.classList.remove('active');
@@ -500,11 +721,13 @@
         // ゲーム開始ボタン状態更新
         function updateStartButton() {
             const startBtn = document.getElementById('startGameBtn');
-            startBtn.disabled = members.length < 6 || gameStarted;
+            const memberCount = gameState.members.length;
             
-            if (members.length < 6) {
-                startBtn.textContent = `ゲーム開始 (${members.length}/6人以上必要)`;
-            } else if (gameStarted) {
+            startBtn.disabled = memberCount < 6 || gameState.gameStarted;
+            
+            if (memberCount < 6) {
+                startBtn.textContent = `ゲーム開始 (${memberCount}/6人以上必要)`;
+            } else if (gameState.gameStarted) {
                 startBtn.textContent = 'ゲーム進行中';
             } else {
                 startBtn.textContent = 'ゲーム開始';
@@ -513,45 +736,51 @@
 
         // ゲーム開始
         function startGame() {
-            if (members.length < 6) {
+            if (gameState.members.length < 6) {
                 alert('最低6名のメンバーが必要です');
                 return;
             }
             
-            gameStarted = true;
-            isSelectingLeaders = true;
-            currentTeam = 'A';
-            leaderSelected = { A: false, B: false, C: false };
+            gameState.gameStarted = true;
+            gameState.isSelectingLeaders = true;
+            gameState.currentTeam = 'A';
+            gameState.leaderSelected = { A: false, B: false, C: false };
             
+            saveGameState();
             updateDisplay();
-            updateStartButton();
         }
 
         // ゲーム終了チェック
         function checkGameEnd() {
-            const availableCount = members.filter(m => m.available).length;
+            const availableCount = gameState.members.filter(m => m.available).length;
             if (availableCount === 0) {
                 setTimeout(() => {
                     alert('🎉 チーム作成完了！\n\n' + 
-                          `チームA: ${teams.A.join(', ')}\n` +
-                          `チームB: ${teams.B.join(', ')}\n` +
-                          `チームC: ${teams.C.join(', ')}`);
+                          `チームA: ${gameState.teams.A.join(', ')}\n` +
+                          `チームB: ${gameState.teams.B.join(', ')}\n` +
+                          `チームC: ${gameState.teams.C.join(', ')}`);
                 }, 500);
             }
         }
 
         // ゲームリセット
         function resetGame() {
-            if (confirm('ゲームをリセットしますか？すべてのデータが削除されます。')) {
-                members = [];
-                teams = { A: [], B: [], C: [] };
-                gameStarted = false;
-                currentTeam = 'A';
-                isSelectingLeaders = true;
-                leaderSelected = { A: false, B: false, C: false };
+            if (confirm('🗑️ すべてのデータを完全にリセットしますか？\n\n' +
+                       '※ この操作は取り消せません')) {
+                gameState = {
+                    members: [],
+                    teams: { A: [], B: [], C: [] },
+                    gameStarted: false,
+                    currentTeam: 'A',
+                    isSelectingLeaders: true,
+                    leaderSelected: { A: false, B: false, C: false }
+                };
+                
+                // ローカルストレージからも削除
+                localStorage.removeItem(STORAGE_KEY);
+                updateSaveStatus('success', '🗑️ データをリセットしました');
                 
                 updateDisplay();
-                updateStartButton();
             }
         }
 
@@ -562,9 +791,25 @@
             }
         });
 
+        // タッチイベントの改善（iOS Safari対応）
+        document.addEventListener('touchstart', function() {}, {passive: true});
+
+        // ページロード時にデータを復元
+        window.addEventListener('load', function() {
+            loadGameState();
+            updateDisplay();
+        });
+
+        // ページ離脱前に確認（ゲーム進行中のみ）
+        window.addEventListener('beforeunload', function(e) {
+            if (gameState.gameStarted && gameState.members.some(m => m.available)) {
+                e.preventDefault();
+                e.returnValue = 'ゲームが進行中です。本当にページを離れますか？';
+            }
+        });
+
         // 初期表示
         updateDisplay();
-        updateStartButton();
     </script>
 </body>
 </html>

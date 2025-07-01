@@ -77,7 +77,14 @@
         .team.drag-over{background-color:rgba(79,172,254,0.1);border-style:dashed}
         .available-members.drag-over{background-color:rgba(255,193,7,0.2);border-style:dashed}
 
-        /* tablet */
+        /* モバイル用の追加スタイル */
+        @media (hover: none) and (pointer: coarse) {
+            .member-item, .team-member {
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+        }
         @media(min-width:768px){
             .game-area{grid-template-columns:1fr 2fr}
             .teams-container{grid-template-columns:repeat(3,1fr);gap:20px}
@@ -533,8 +540,8 @@
         // ======= 9) ゲーム開始／リセット =======
         const startGame = () => {
             if(gameState.gameStarted) return;
-            if(!gameState.members || gameState.members.length < 6){
-                alert('最低6名のメンバーが必要です');
+            if(!gameState.members || gameState.members.length < 3){
+                alert('最低3名のメンバーが必要です');
                 return;
             }
             
@@ -609,7 +616,10 @@
                      onclick="selectMember('${m.name}')"
                      draggable="true"
                      ondragstart="handleDragStart(event, '${m.name}', 'available')"
-                     ondragend="handleDragEnd(event)">
+                     ondragend="handleDragEnd(event)"
+                     ontouchstart="handleTouchStart(event, '${m.name}', 'available')"
+                     ontouchmove="handleTouchMove(event)"
+                     ontouchend="handleTouchEnd(event)">
                     <span>${m.name}</span>
                     <button class="delete-btn" onclick="event.stopPropagation(); deleteMember('${m.name}')" title="削除">×</button>
                     ${canSelectMember()?'<span style="font-size:.7rem;color:#28a745;margin-right:30px">選択</span>':''}
@@ -629,7 +639,10 @@
                     <div class="team-member" 
                          draggable="true"
                          ondragstart="handleDragStart(event, '${name}', '${t}')"
-                         ondragend="handleDragEnd(event)">
+                         ondragend="handleDragEnd(event)"
+                         ontouchstart="handleTouchStart(event, '${name}', '${t}')"
+                         ontouchmove="handleTouchMove(event)"
+                         ontouchend="handleTouchEnd(event)">
                         ${i===0?'👑 ':''}${name}${i===0?' (代表)':''}
                     </div>
                 `).join('');
@@ -646,9 +659,19 @@
                 txt.textContent='ゲーム開始を待っています';
                 return;
             }
-            txt.textContent = gameState.isSelectingLeaders ? 
-                `代表者選択 - チーム${gameState.currentTeam}` : 
-                `チーム${gameState.currentTeam} の順番です`;
+            
+            if(gameState.isSelectingLeaders) {
+                txt.textContent = `代表者選択 - チーム${gameState.currentTeam}`;
+            } else {
+                // 現在のチームで最後に選ばれたメンバーの名前を取得
+                const currentTeamMembers = gameState.teams[gameState.currentTeam];
+                if(currentTeamMembers && currentTeamMembers.length > 0) {
+                    const lastMember = currentTeamMembers[currentTeamMembers.length - 1];
+                    txt.textContent = `${lastMember}さんの番です`;
+                } else {
+                    txt.textContent = `チーム${gameState.currentTeam} の順番です`;
+                }
+            }
         };
         
         const updateTeamHighlight = () => {
@@ -676,29 +699,39 @@
             }
             
             const memberCount = gameState.members ? gameState.members.length : 0;
-            btn.disabled = memberCount < 6;
-            btn.textContent = memberCount < 6 ? `ゲーム開始 (${memberCount}/6)` : 'ゲーム開始';
+            btn.disabled = memberCount < 3;
+            btn.textContent = memberCount < 3 ? `ゲーム開始 (${memberCount}/3)` : 'ゲーム開始';
         };
 
-        // ======= 12) ドラッグ&ドロップ機能 =======
+        // ======= 12) ドラッグ&ドロップ機能（PC & モバイル対応） =======
+        let touchItem = null;
+        let touchTimeout = null;
+        let isDragging = false;
+        
+        // PC用ドラッグ
         const handleDragStart = (e, memberName, from) => {
-            draggedMember = memberName;
-            draggedFrom = from;
-            e.target.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
+            if(e.type === 'dragstart') {
+                draggedMember = memberName;
+                draggedFrom = from;
+                e.target.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            }
         };
 
         const handleDragEnd = (e) => {
-            e.target.classList.remove('dragging');
-            // ドラッグオーバーのスタイルをクリア
-            document.querySelectorAll('.drag-over').forEach(el => {
-                el.classList.remove('drag-over');
-            });
+            if(e.type === 'dragend') {
+                e.target.classList.remove('dragging');
+                document.querySelectorAll('.drag-over').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+            }
         };
 
         const handleDragOver = (e) => {
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
+            if(e.dataTransfer) {
+                e.dataTransfer.dropEffect = 'move';
+            }
             const target = e.currentTarget;
             if(!target.classList.contains('drag-over')) {
                 target.classList.add('drag-over');
@@ -717,26 +750,115 @@
             
             if(!draggedMember || !draggedFrom || draggedFrom === to) return;
             
+            moveMember(draggedMember, draggedFrom, to);
+            
+            draggedMember = null;
+            draggedFrom = null;
+        };
+
+        // モバイル用タッチ
+        const handleTouchStart = (e, memberName, from) => {
+            touchItem = e.target;
+            touchTimeout = setTimeout(() => {
+                isDragging = true;
+                draggedMember = memberName;
+                draggedFrom = from;
+                touchItem.classList.add('dragging');
+                touchItem.style.position = 'fixed';
+                touchItem.style.zIndex = '9999';
+                touchItem.style.pointerEvents = 'none';
+                
+                // 振動フィードバック（対応デバイスのみ）
+                if(navigator.vibrate) navigator.vibrate(50);
+            }, 500); // 500ms長押し
+        };
+
+        const handleTouchMove = (e) => {
+            if(touchTimeout && !isDragging) {
+                clearTimeout(touchTimeout);
+                touchTimeout = null;
+            }
+            
+            if(isDragging && touchItem) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                touchItem.style.left = (touch.clientX - touchItem.offsetWidth/2) + 'px';
+                touchItem.style.top = (touch.clientY - touchItem.offsetHeight/2) + 'px';
+                
+                // ドロップ可能エリアの検出
+                const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                
+                if(dropTarget) {
+                    const droppable = dropTarget.closest('.team, .available-members');
+                    if(droppable) droppable.classList.add('drag-over');
+                }
+            }
+        };
+
+        const handleTouchEnd = (e) => {
+            if(touchTimeout) {
+                clearTimeout(touchTimeout);
+                touchTimeout = null;
+            }
+            
+            if(isDragging && touchItem) {
+                const touch = e.changedTouches[0];
+                const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+                
+                touchItem.classList.remove('dragging');
+                touchItem.style.position = '';
+                touchItem.style.zIndex = '';
+                touchItem.style.pointerEvents = '';
+                touchItem.style.left = '';
+                touchItem.style.top = '';
+                
+                document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+                
+                if(dropTarget) {
+                    const teamA = dropTarget.closest('#teamA');
+                    const teamB = dropTarget.closest('#teamB');
+                    const teamC = dropTarget.closest('#teamC');
+                    const available = dropTarget.closest('.available-members');
+                    
+                    let to = null;
+                    if(teamA) to = 'A';
+                    else if(teamB) to = 'B';
+                    else if(teamC) to = 'C';
+                    else if(available) to = 'available';
+                    
+                    if(to && draggedMember && draggedFrom !== to) {
+                        moveMember(draggedMember, draggedFrom, to);
+                    }
+                }
+                
+                isDragging = false;
+                draggedMember = null;
+                draggedFrom = null;
+                touchItem = null;
+            }
+        };
+
+        // メンバー移動の共通処理
+        const moveMember = (memberName, from, to) => {
             // 元の場所から削除
-            if(draggedFrom === 'available') {
-                const idx = gameState.members.findIndex(m => m.name === draggedMember);
+            if(from === 'available') {
+                const idx = gameState.members.findIndex(m => m.name === memberName);
                 if(idx !== -1) gameState.members[idx].available = false;
             } else {
-                const idx = gameState.teams[draggedFrom].indexOf(draggedMember);
-                if(idx !== -1) gameState.teams[draggedFrom].splice(idx, 1);
+                const idx = gameState.teams[from].indexOf(memberName);
+                if(idx !== -1) gameState.teams[from].splice(idx, 1);
             }
             
             // 新しい場所に追加
             if(to === 'available') {
-                const idx = gameState.members.findIndex(m => m.name === draggedMember);
+                const idx = gameState.members.findIndex(m => m.name === memberName);
                 if(idx !== -1) gameState.members[idx].available = true;
             } else {
                 if(!gameState.teams[to]) gameState.teams[to] = [];
-                gameState.teams[to].push(draggedMember);
+                gameState.teams[to].push(memberName);
             }
             
-            draggedMember = null;
-            draggedFrom = null;
             syncGameState();
         };
 

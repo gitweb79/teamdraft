@@ -83,6 +83,16 @@
         <!-- 🔌 接続状況 -->
         <div id="connectionStatus" class="connection-status disconnected">🔴 Firebase 未接続</div>
 
+        <!-- 👤 ユーザー設定 -->
+        <section class="room-setup" style="background:#e8f5e9;border-color:#4caf50;margin-bottom:10px">
+            <h3 style="color:#2e7d32">ユーザー設定</h3>
+            <div class="room-controls">
+                <input id="userNameInput" type="text" placeholder="ユーザー名" maxlength="15" />
+                <button onclick="updateUserName()">名前を変更</button>
+            </div>
+            <p style="margin-top:8px;font-size:.75rem;color:#555">現在の名前: <strong id="currentUserName">未設定</strong></p>
+        </section>
+
         <!-- 🏠 ルーム設定 -->
         <section class="room-setup">
             <h3>ルームを作成 / 参加</h3>
@@ -90,8 +100,17 @@
                 <input id="roomInput" type="text" placeholder="ルーム名を入力" maxlength="20" />
                 <button onclick="joinRoom()">参加</button>
                 <button onclick="createRandomRoom()">ランダム作成</button>
+                <button id="leaveRoomBtn" onclick="leaveRoom()" style="display:none;background:linear-gradient(135deg,#ff416c 0%,#ff4b2b 100%)">退室</button>
             </div>
             <p style="margin-top:10px;font-size:.75rem;color:#555">同じルーム名で入ると画面が同期されます</p>
+        </section>
+
+        <!-- 📋 アクティブルーム一覧 -->
+        <section id="activeRooms" class="room-setup" style="background:#f0f8ff;border-color:#87ceeb;margin-top:10px">
+            <h3 style="color:#4682b4">アクティブなルーム</h3>
+            <div id="roomList" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px">
+                <div class="empty-state">ルームを確認中...</div>
+            </div>
         </section>
 
         <!-- 👥 オンラインユーザー -->
@@ -163,9 +182,10 @@
         // ======= 2) 変数初期化 =======
         let app, db, currentRoom = null;
         const userId = `user_${Math.random().toString(36).slice(2,9)}`;
+        let userName = localStorage.getItem('draftUserName') || userId;
         let connectedUsers = {};
-        let gameState = {};
-
+        let roomListListener = null;
+        
         // デフォルト状態を返す関数
         const initialGameState = () => ({
             members: [],               // {name, available}
@@ -175,6 +195,9 @@
             leaderSelected: { A:false, B:false, C:false },
             currentTeam: 'A'
         });
+        
+        // gameStateを初期化
+        let gameState = initialGameState();
 
         // ======= 3) Firebase 初期化 =======
         const initFirebase = () => {
@@ -185,11 +208,18 @@
                 // 接続状況監視
                 db.ref('.info/connected').on('value', snap => {
                     const connected = snap.val() === true;
-                    updateConnectionStatus(connected ? 'connected' : 'disconnected', connected ? '🟢 Firebase に接続しました' : '🔴 Firebase との接続が切断されました');
+                    updateConnectionStatus(connected ? 'connected' : 'disconnected', 
+                        connected ? '🟢 Firebase に接続しました' : '🔴 Firebase との接続が切断されました');
+                    
+                    // 接続成功時にルーム監視を開始
+                    if(connected) {
+                        setTimeout(() => watchActiveRooms(), 1000); // 少し遅延させて確実に接続
+                    }
                 });
+                
                 return true;
             } catch (e) {
-                console.error(e);
+                console.error('Firebase初期化エラー:', e);
                 updateConnectionStatus('disconnected', 'Firebase 初期化失敗');
                 return false;
             }
@@ -204,8 +234,8 @@
         };
         const enableUI = () => {
             qs('#memberName').disabled = false;
-            qs('button[onclick="addMember()"]').disabled = false;
-            qs('button[onclick="resetGame()"]').disabled = false;
+            qs('#addMemberBtn').disabled = false;
+            qs('.reset-btn').disabled = false;
         };
 
         // ======= 5) ルーム参加／作成 =======
@@ -220,8 +250,17 @@
             const room = qs('#roomInput').value.trim();
             if(!room){alert('ルーム名を入力してください');return;}
 
+            // 既に同じルームにいる場合は何もしない
+            if(currentRoom === room) {
+                alert('既にこのルームに参加しています');
+                return;
+            }
+
             // 旧リスナ解除
-            if(currentRoom) db.ref(`rooms/${currentRoom}`).off();
+            if(currentRoom) {
+                leaveRoom(false); // アラートなしで退室
+            }
+            
             currentRoom = room;
             updateConnectionStatus('connecting','🟡 ルームに接続中…');
 
@@ -229,7 +268,11 @@
             db.ref(`rooms/${room}/gameState`).on('value', snap=>{
                 if(snap.exists()){
                     gameState = snap.val();
+                    // データの整合性チェック
+                    if(!gameState.members) gameState.members = [];
+                    if(!gameState.teams) gameState.teams = { A: [], B: [], C: [] };
                 }else{
+                    // 新規ルームの場合は初期状態を設定
                     gameState = initialGameState();
                     db.ref(`rooms/${room}/gameState`).set(gameState);
                 }
@@ -238,29 +281,147 @@
 
             // オンラインユーザー監視
             db.ref(`rooms/${room}/users`).on('value', snap=>{
-                connectedUsers = snap.val()||{};updateOnlineUsers();
+                connectedUsers = snap.val()||{};
+                updateOnlineUsers();
             });
 
             // 自分を登録 & 切断時削除
             const userRef = db.ref(`rooms/${room}/users/${userId}`);
-            userRef.set({joinedAt:firebase.database.ServerValue.TIMESTAMP});
+            userRef.set({
+                name: userName,
+                joinedAt: firebase.database.ServerValue.TIMESTAMP
+            });
             userRef.onDisconnect().remove();
 
             enableUI();
             qs('#turnIndicator').style.display='block';
+            qs('#leaveRoomBtn').style.display='inline-block';
             updateConnectionStatus('connected',`🟢 ルーム "${room}" に参加中`);
             updateDisplay();
+        };
+
+        // ルーム退室
+        const leaveRoom = (showAlert = true) => {
+            if(!currentRoom) return;
+
+            // リスナー解除
+            db.ref(`rooms/${currentRoom}`).off();
+            
+            // ユーザー削除
+            db.ref(`rooms/${currentRoom}/users/${userId}`).remove();
+            
+            // UI リセット
+            currentRoom = null;
+            gameState = initialGameState();
+            connectedUsers = {};
+            
+            // UI 無効化
+            qs('#memberName').disabled = true;
+            qs('#addMemberBtn').disabled = true;
+            qs('.reset-btn').disabled = true;
+            qs('#turnIndicator').style.display = 'none';
+            qs('#leaveRoomBtn').style.display = 'none';
+            qs('#roomInput').value = '';
+            
+            updateDisplay();
+            updateOnlineUsers();
+            updateConnectionStatus('connected', '🟢 Firebase に接続しました（ルーム未参加）');
+            
+            if(showAlert) {
+                alert('ルームから退室しました');
+            }
+        };
+
+        // ユーザー名更新
+        const updateUserName = () => {
+            const newName = qs('#userNameInput').value.trim();
+            if(!newName) {
+                alert('ユーザー名を入力してください');
+                return;
+            }
+            
+            userName = newName;
+            localStorage.setItem('draftUserName', userName);
+            qs('#currentUserName').textContent = userName;
+            qs('#userNameInput').value = '';
+            
+            // 現在ルームに参加中なら更新
+            if(currentRoom && db) {
+                db.ref(`rooms/${currentRoom}/users/${userId}/name`).set(userName);
+            }
+            
+            alert('ユーザー名を変更しました');
+        };
+
+        // アクティブルーム監視
+        const watchActiveRooms = () => {
+            if(!db) {
+                console.log('DB未接続のためルーム監視をスキップ');
+                return;
+            }
+            
+            console.log('ルーム監視を開始');
+            
+            // 既存のリスナーがあれば解除
+            if(roomListListener) {
+                db.ref('rooms').off('value', roomListListener);
+            }
+            
+            roomListListener = db.ref('rooms').on('value', snap => {
+                const rooms = snap.val() || {};
+                console.log('ルーム一覧取得:', rooms);
+                updateRoomList(rooms);
+            }, error => {
+                console.error('ルーム一覧取得エラー:', error);
+                qs('#roomList').innerHTML = '<div class="empty-state">ルーム一覧の取得に失敗しました</div>';
+            });
+        };
+
+        // ルーム一覧更新
+        const updateRoomList = (rooms) => {
+            const container = qs('#roomList');
+            const roomNames = Object.keys(rooms);
+            
+            if(roomNames.length === 0) {
+                container.innerHTML = '<div class="empty-state">アクティブなルームがありません</div>';
+                return;
+            }
+            
+            container.innerHTML = roomNames.map(roomName => {
+                const room = rooms[roomName];
+                const userCount = room.users ? Object.keys(room.users).length : 0;
+                const memberCount = room.gameState && room.gameState.members ? room.gameState.members.length : 0;
+                const isCurrentRoom = roomName === currentRoom;
+                
+                return `
+                    <div style="background:${isCurrentRoom ? '#28a745' : '#87ceeb'};color:white;padding:8px 12px;border-radius:8px;cursor:pointer;font-size:.85rem" 
+                         onclick="${isCurrentRoom ? '' : `document.getElementById('roomInput').value='${roomName}';joinRoom()`}">
+                        <strong>${roomName}</strong>
+                        <div style="font-size:.7rem;margin-top:2px">
+                            👥 ${userCount}人 | 📋 ${memberCount}名登録
+                            ${isCurrentRoom ? ' (参加中)' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         };
 
         // ======= 6) オンラインユーザー表示 =======
         const updateOnlineUsers = () => {
             const container = qs('#onlineUsers');
             const list = qs('#userList');
-            qs('#userCount').textContent = Object.keys(connectedUsers).length;
-            if(Object.keys(connectedUsers).length){
+            const users = Object.entries(connectedUsers);
+            qs('#userCount').textContent = users.length;
+            if(users.length > 0){
                 container.style.display='block';
-                list.innerHTML = Object.keys(connectedUsers).map(uid=>`<span class="user-badge">${uid}</span>`).join('');
-            }else container.style.display='none';
+                list.innerHTML = users.map(([uid, data]) => {
+                    const displayName = data.name || uid;
+                    const isMe = uid === userId;
+                    return `<span class="user-badge" style="${isMe ? 'background:#28a745' : ''}">${displayName}${isMe ? ' (自分)' : ''}</span>`;
+                }).join('');
+            }else{
+                container.style.display='none';
+            }
         };
 
         // ======= 7) メンバー追加 =======
@@ -268,8 +429,18 @@
             if(!currentRoom){alert('ルームに参加してください');return;}
             const name = qs('#memberName').value.trim();
             if(!name){alert('メンバー名を入力してください');return;}
-            if(gameState.members.some(m=>m.name===name)){alert('同名のメンバーがいます');return;}
-            gameState.members.push({name,available:true});
+            
+            // gameState.membersが配列であることを確認
+            if(!Array.isArray(gameState.members)){
+                gameState.members = [];
+            }
+            
+            if(gameState.members.some(m=>m.name===name)){
+                alert('同名のメンバーがいます');
+                return;
+            }
+            
+            gameState.members.push({name, available:true});
             qs('#memberName').value='';
             syncGameState();
         };
@@ -278,13 +449,14 @@
         const canSelectMember = () => {
             if(!gameState.gameStarted) return false;
             if(gameState.isSelectingLeaders) return !gameState.leaderSelected[gameState.currentTeam];
-            return gameState.members.some(m=>m.available);
+            return gameState.members && gameState.members.some(m=>m.available);
         };
 
         const selectMember = (memberName) => {
             if(!canSelectMember()){alert('現在選択権がありません');return;}
             const idx = gameState.members.findIndex(m=>m.name===memberName);
             if(idx===-1 || !gameState.members[idx].available) return;
+            
             // 配属
             gameState.members[idx].available=false;
             gameState.teams[gameState.currentTeam].push(memberName);
@@ -306,7 +478,7 @@
         };
 
         const checkGameEnd = () => {
-            if(gameState.members.every(m=>!m.available)){
+            if(gameState.members && gameState.members.every(m=>!m.available)){
                 gameState.gameStarted=false;
                 syncGameState();
                 alert('チーム編成が完了しました！');
@@ -316,9 +488,20 @@
         // ======= 9) ゲーム開始／リセット =======
         const startGame = () => {
             if(gameState.gameStarted) return;
-            if(gameState.members.length < 6){alert('最低6名のメンバーが必要です');return;}
-            gameState = {...gameState, ...initialGameState(), members:[...gameState.members]}; // メンバー保持
+            if(!gameState.members || gameState.members.length < 6){
+                alert('最低6名のメンバーが必要です');
+                return;
+            }
+            
+            // メンバーを保持しながら他の状態をリセット
             gameState.gameStarted = true;
+            gameState.isSelectingLeaders = true;
+            gameState.leaderSelected = { A:false, B:false, C:false };
+            gameState.currentTeam = 'A';
+            gameState.teams = { A: [], B: [], C: [] };
+            // メンバーの available を全て true に
+            gameState.members.forEach(m => m.available = true);
+            
             syncGameState();
         };
 
@@ -330,7 +513,9 @@
 
         // =======10) Firebase 同期 =======
         const syncGameState = () => {
-            if(currentRoom) db.ref(`rooms/${currentRoom}/gameState`).set(gameState);
+            if(currentRoom && db) {
+                db.ref(`rooms/${currentRoom}/gameState`).set(gameState);
+            }
         };
 
         // =======11) 表示更新 =======
@@ -344,45 +529,116 @@
 
         const updateAvailableMembers = () => {
             const container = qs('#availableMembers');
-            const available = gameState.members.filter(m=>m.available);
-            if(!currentRoom){container.innerHTML='<div class="empty-state">ルームに参加してください</div>';return;}
-            if(!available.length){container.innerHTML='<div class="empty-state">控えメンバーがいません</div>';return;}
-            container.innerHTML = available.map(m=>`<div class="member-item ${canSelectMember()?'selectable':''}" onclick="selectMember('${m.name}')">${m.name} ${canSelectMember()?'<span style=\"font-size:.7rem;color:#28a745\">選択</span>':''}</div>`).join('');
+            if(!currentRoom){
+                container.innerHTML='<div class="empty-state">ルームに参加してください</div>';
+                return;
+            }
+            
+            const available = gameState.members ? gameState.members.filter(m=>m.available) : [];
+            if(!available.length){
+                container.innerHTML='<div class="empty-state">控えメンバーがいません</div>';
+                return;
+            }
+            
+            container.innerHTML = available.map(m=>`
+                <div class="member-item ${canSelectMember()?'selectable':''}" onclick="selectMember('${m.name}')">
+                    ${m.name} ${canSelectMember()?'<span style="font-size:.7rem;color:#28a745">選択</span>':''}
+                </div>
+            `).join('');
         };
 
         const updateTeamDisplay = () => {
             ['A','B','C'].forEach(t=>{
                 const listEl = qs(`#team${t}Members`);
-                const members = gameState.teams[t];
-                if(!members.length){listEl.innerHTML='<div class="empty-state">メンバーなし</div>';return;}
-                listEl.innerHTML = members.map((name,i)=>`<div class="team-member">${i===0?'👑 ':''}${name}${i===0?' (代表)':''}</div>`).join('');
+                const members = gameState.teams && gameState.teams[t] ? gameState.teams[t] : [];
+                if(!members.length){
+                    listEl.innerHTML='<div class="empty-state">メンバーなし</div>';
+                    return;
+                }
+                listEl.innerHTML = members.map((name,i)=>`
+                    <div class="team-member">${i===0?'👑 ':''}${name}${i===0?' (代表)':''}</div>
+                `).join('');
             });
         };
+        
         const updateTurnIndicator = () => {
             const txt = qs('#turnText');
-            if(!currentRoom){txt.textContent='ルームに参加してください';return;}
-            if(!gameState.gameStarted){txt.textContent='ゲーム開始を待っています';return;}
-            txt.textContent = gameState.isSelectingLeaders ? `代表者選択 - チーム${gameState.currentTeam}` : `チーム${gameState.currentTeam} の順番です`;
+            if(!currentRoom){
+                txt.textContent='ルームに参加してください';
+                return;
+            }
+            if(!gameState.gameStarted){
+                txt.textContent='ゲーム開始を待っています';
+                return;
+            }
+            txt.textContent = gameState.isSelectingLeaders ? 
+                `代表者選択 - チーム${gameState.currentTeam}` : 
+                `チーム${gameState.currentTeam} の順番です`;
         };
+        
         const updateTeamHighlight = () => {
             ['A','B','C'].forEach(t=>{
                 const el = qs(`#team${t}`);
-                if(gameState.gameStarted && t===gameState.currentTeam && canSelectMember()) el.classList.add('active');
-                else el.classList.remove('active');
+                if(gameState.gameStarted && t===gameState.currentTeam && canSelectMember()) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
             });
         };
+        
         const updateStartButton = () => {
             const btn = qs('#startGameBtn');
-            if(!currentRoom){btn.disabled=true;btn.textContent='ルームに参加してください';return;}
-            if(gameState.gameStarted){btn.disabled=true;btn.textContent='ゲーム進行中';return;}
-            btn.disabled = gameState.members.length < 6;
-            btn.textContent = gameState.members.length < 6 ? `ゲーム開始 (${gameState.members.length}/6)` : 'ゲーム開始';
+            if(!currentRoom){
+                btn.disabled=true;
+                btn.textContent='ルームに参加してください';
+                return;
+            }
+            if(gameState.gameStarted){
+                btn.disabled=true;
+                btn.textContent='ゲーム進行中';
+                return;
+            }
+            
+            const memberCount = gameState.members ? gameState.members.length : 0;
+            btn.disabled = memberCount < 6;
+            btn.textContent = memberCount < 6 ? `ゲーム開始 (${memberCount}/6)` : 'ゲーム開始';
         };
 
         // =======12) ページロード後 =======
         window.addEventListener('load',()=>{
-            if(initFirebase()){
-                // 接続できた
+            initFirebase();
+            
+            // ユーザー名を表示
+            qs('#currentUserName').textContent = userName;
+            qs('#userNameInput').value = userName;
+            
+            // Enterキーでのメンバー追加
+            qs('#memberName').addEventListener('keypress', (e) => {
+                if(e.key === 'Enter' && !e.target.disabled) {
+                    addMember();
+                }
+            });
+            
+            // Enterキーでのルーム参加
+            qs('#roomInput').addEventListener('keypress', (e) => {
+                if(e.key === 'Enter') {
+                    joinRoom();
+                }
+            });
+            
+            // Enterキーでのユーザー名変更
+            qs('#userNameInput').addEventListener('keypress', (e) => {
+                if(e.key === 'Enter') {
+                    updateUserName();
+                }
+            });
+        });
+
+        // ページ離脱時のクリーンアップ
+        window.addEventListener('beforeunload', () => {
+            if(currentRoom) {
+                db.ref(`rooms/${currentRoom}/users/${userId}`).remove();
             }
         });
     </script>

@@ -397,7 +397,7 @@
             db.ref(`rooms/${currentRoom}/users/${userId}`).remove();
             
             // UI リセット
-            currentRoom = null;
+            currentRoom = null; // これで現在のルームをクリア
             gameState = initialGameState();
             connectedUsers = {};
             
@@ -413,6 +413,12 @@
             updateOnlineUsers();
             updateConnectionStatus('connected', '🟢 Firebase に接続しました（ルーム未参加）');
             
+            // ルーム一覧を強制的に更新（退室したルームの緑色を解除）
+            db.ref('rooms').once('value', snap => {
+                const rooms = snap.val() || {};
+                updateRoomList(rooms);
+            });
+            
             if(showAlert) {
                 alert('ルームから退室しました');
             }
@@ -423,14 +429,17 @@
                     const roomData = snap.val();
                     if(roomData) {
                         const hasUsers = roomData.users && Object.keys(roomData.users).length > 0;
-                        const gameStarted = roomData.gameState && roomData.gameState.gameStarted;
+                        const gameStarted = roomData.gameState && roomData.gameState.gameStarted === true;
+                        const hasMembers = roomData.gameState && roomData.gameState.members && roomData.gameState.members.length > 0;
                         
-                        // ユーザーが0人で、かつゲームが開始されていないルームのみ削除
-                        if(!hasUsers && !gameStarted) {
-                            console.log(`ルーム ${leavingRoom} が空になり、ゲーム未開始のため削除します`);
+                        // ユーザーが0人で、かつゲームが開始されていない、かつメンバー登録もないルームのみ削除
+                        if(!hasUsers && !gameStarted && !hasMembers) {
+                            console.log(`ルーム ${leavingRoom} が空になり、ゲーム未開始、メンバーなしのため削除します`);
                             db.ref(`rooms/${leavingRoom}`).remove();
-                        } else if(!hasUsers && gameStarted) {
-                            console.log(`ルーム ${leavingRoom} は空ですが、ゲーム開始済みのため保持します`);
+                        } else if(!hasUsers) {
+                            console.log(`ルーム ${leavingRoom} は空ですが、以下の理由で保持します:`);
+                            console.log(`- ゲーム開始: ${gameStarted}`);
+                            console.log(`- メンバー数: ${hasMembers ? roomData.gameState.members.length : 0}`);
                         }
                     }
                 });
@@ -563,23 +572,31 @@
                 Object.keys(rooms).forEach(roomName => {
                     const room = rooms[roomName];
                     const hasUsers = room.users && Object.keys(room.users).length > 0;
-                    const gameStarted = room.gameState && room.gameState.gameStarted;
+                    const gameStarted = room.gameState && room.gameState.gameStarted === true;
+                    const hasMembers = room.gameState && room.gameState.members && room.gameState.members.length > 0;
                     
-                    // ユーザーが0人で、かつゲームが開始されていないルームのみ削除
-                    if(!hasUsers && !gameStarted) {
-                        console.log(`空のルーム ${roomName} を削除します`);
+                    // ユーザーが0人で、かつゲームが開始されていない、かつメンバー登録もないルームのみ削除
+                    if(!hasUsers && !gameStarted && !hasMembers) {
+                        console.log(`空のルーム ${roomName} を削除対象として検出`);
+                        console.log(`- ユーザー数: ${hasUsers ? Object.keys(room.users).length : 0}`);
+                        console.log(`- ゲーム開始: ${gameStarted}`);
+                        console.log(`- メンバー数: ${hasMembers ? room.gameState.members.length : 0}`);
+                        
                         // 1秒後に再確認して削除
                         setTimeout(() => {
                             db.ref(`rooms/${roomName}`).once('value', roomSnap => {
                                 const roomData = roomSnap.val();
                                 if(roomData) {
                                     const stillNoUsers = !roomData.users || Object.keys(roomData.users).length === 0;
-                                    const stillNotStarted = !roomData.gameState || !roomData.gameState.gameStarted;
+                                    const stillNotStarted = !roomData.gameState || roomData.gameState.gameStarted !== true;
+                                    const stillNoMembers = !roomData.gameState || !roomData.gameState.members || roomData.gameState.members.length === 0;
                                     
-                                    if(stillNoUsers && stillNotStarted) {
+                                    if(stillNoUsers && stillNotStarted && stillNoMembers) {
                                         db.ref(`rooms/${roomName}`).remove()
                                             .then(() => console.log(`ルーム ${roomName} を削除しました`))
                                             .catch(err => console.error(`ルーム削除エラー:`, err));
+                                    } else {
+                                        console.log(`ルーム ${roomName} は削除条件を満たさないため保持`);
                                     }
                                 }
                             });
@@ -611,7 +628,7 @@
                 
                 return `
                     <div class="room-item ${isCurrentRoom ? 'current' : ''}" 
-                         onclick="${isCurrentRoom ? '' : `document.getElementById('roomInput').value='${roomName}';joinRoom()`}">
+                         onclick="${isCurrentRoom ? '' : `selectRoom('${roomName}')`}">
                         ${(userCount > 0 && isAdmin) ? `<button class="delete-room-btn" onclick="event.stopPropagation(); deleteRoom('${roomName}')" title="ルーム削除">×</button>` : ''}
                         <strong>${roomName}</strong>
                         <div style="font-size:.7rem;margin-top:2px">
@@ -1088,6 +1105,12 @@
             });
             
             syncGameState();
+        };
+
+        // ルーム選択
+        const selectRoom = (roomName) => {
+            qs('#roomInput').value = roomName;
+            joinRoom();
         };
 
         // ======= 13) ページロード後 =======

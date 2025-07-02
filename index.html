@@ -52,6 +52,17 @@
 
         .game-area{display:grid;grid-template-columns:1fr;gap:20px;margin-top:20px}
         .available-members{order:2;background:#fff3cd;border:2px solid #ffeaa7;border-radius:10px;padding:14px}
+        /* #availableMembers コンテナを２列グリッドに */
+        #availableMembers {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px; /* アイテム間のスペース */
+        }
+        /* グリッドアイテムの余白をリセット */
+        #availableMembers .member-item {
+          margin: 0;
+        }        
+        
         .available-members h3{color:#856404;font-size:1rem;margin-bottom:10px}
         .member-item{display:flex;justify-content:space-between;align-items:center;background:#fff;border:2px solid #ddd;border-radius:8px;padding:12px;margin:6px 0;cursor:pointer;transition:.2s;font-size:.9rem;min-height:46px;position:relative}
         .member-item:hover{border-color:#4facfe;box-shadow:0 3px 10px rgba(0,0,0,.1);transform:translateY(-1px)}
@@ -120,12 +131,15 @@
             <div class="user-settings">
                 <input id="userNameInput" type="text" placeholder="名前" maxlength="10" />
                 <button onclick="updateUserName()">変更</button>
+                  <p style="font-size:0.6rem; color:#000; margin-top:4px;">
+                    ユーザ名変更は任意。抽選に影響しません。
+                  </p>
                 <p>👤 <strong id="currentUserName">未設定</strong></p>
             </div>
         </header>
 
         <!-- 🔌 接続状況 -->
-        <div id="connectionStatus" class="connection-status disconnected">🔴 Firebase 未接続</div>
+        <div id="connectionStatus" class="connection-status disconnected">🔴 システム 未接続</div>
 
         <!-- 🏠 ルーム設定 -->
         <section class="room-setup admin-only" style="display:none">
@@ -299,7 +313,7 @@
                 db.ref('.info/connected').on('value', snap => {
                     const connected = snap.val() === true;
                     updateConnectionStatus(connected ? 'connected' : 'disconnected', 
-                        connected ? '🟢 Firebase に接続しました' : '🔴 Firebase との接続が切断されました');
+                        connected ? '🟢 システム に接続しました' : '🔴 システム との接続が切断されました');
                     
                     // 接続成功時にルーム監視を開始
                     if(connected) {
@@ -436,7 +450,7 @@
         
             updateDisplay();
             updateOnlineUsers();
-            updateConnectionStatus('connected', '🟢 Firebase に接続しました（ルーム未参加）');
+            updateConnectionStatus('connected', '🟢 システム に接続しました（ルーム未参加）');
         
             // ルーム一覧を強制的に更新（退室したルームの緑色を解除）
             db.ref('rooms').once('value', snap => {
@@ -512,10 +526,11 @@
         
         // 管理者画面を表示するユーティリティ
         function showAdminUI() {
+          // ① ルームに参加中なら退出
+          if (currentRoom) leaveRoom(false);
+        
           isAdmin = true;
-          // 管理者向け要素を全表示
           document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
-          // ボタンを「ログアウト」に切り替え
           const btn = qs('#adminLoginBtn');
           btn.textContent = '🔓 管理者ログアウト';
           btn.onclick = doAdminLogout;
@@ -544,6 +559,10 @@
         // 管理者画面を隠すユーティリティ
         function doAdminLogout() {
           if (!confirm('管理者からログアウトしますか？')) return;
+        
+          // ② ルームに参加中なら退出
+          if (currentRoom) leaveRoom(false);
+        
           isAdmin = false;
           document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
           const btn = qs('#adminLoginBtn');

@@ -89,7 +89,11 @@
             }
         }
         @media(min-width:768px){
-            .game-area{grid-template-columns:1fr 2fr}
+            .game-area {
+              display: grid;
+              grid-template-columns: 2fr 1fr;  /* 左：控え(1) / 右：チーム(2) */
+              gap: 20px;                       /* お好みでカラム間の余白 */
+            }
             .teams-container{grid-template-columns:repeat(3,1fr);gap:20px}
             .game-controls{flex-direction:row;justify-content:center}
         }
@@ -99,6 +103,7 @@
             .user-settings{position:static;transform:none;margin-top:10px;background:rgba(255,255,255,0.3);width:100%}
             #adminLoginBtn{position:static!important;transform:none!important;margin-bottom:10px;width:100%}
         }
+
     </style>
 </head>
 <body>
@@ -124,16 +129,15 @@
         <div id="connectionStatus" class="connection-status disconnected">🔴 Firebase 未接続</div>
 
         <!-- 🏠 ルーム設定 -->
-        <section class="room-setup">
-            <h3>ルームを作成 / 参加</h3>
-            <div class="room-controls">
-                <input id="roomInput" type="text" placeholder="ルーム名を入力" maxlength="20" />
-                <button onclick="joinRoom()">参加</button>
-                <button onclick="createRandomRoom()">ランダム作成</button>
-                <button id="leaveRoomBtn" onclick="leaveRoom()" style="display:none;background:linear-gradient(135deg,#ff416c 0%,#ff4b2b 100%)">退室</button>
-            </div>
-            <p style="margin-top:10px;font-size:.75rem;color:#555">同じルーム名で入ると画面が同期されます</p>
-        </section>
+        <section class="room-setup admin-only" style="display:none">
+          <h3>ルームを作成</h3>
+          <div class="room-controls">
+            <input id="roomInput" type="text" placeholder="ルーム名を入力" maxlength="20" />
+            <button onclick="joinRoom()">作成</button>
+            <button class="admin-only" style="display:none" onclick="createRandomRoom()">ランダム作成</button>
+          </div>
+          <p style="margin-top:10px;font-size:.75rem;color:#555">同じルーム名で入ると画面が同期されます</p>
+        </section
 
         <!-- 📋 アクティブルーム一覧 -->
         <section id="activeRooms" class="room-setup" style="background:#f0f8ff;border-color:#87ceeb;margin-top:10px">
@@ -157,6 +161,11 @@
                     <div class="form-group">
                         <input id="memberName" type="text" placeholder="メンバー名" maxlength="20" disabled />
                         <button id="addMemberBtn" onclick="addMember()" disabled>追加</button>
+                    </div>
+                    <div class="form-group" style="margin-top:10px">
+                        <label for="bulkMemberFile">一括登録（.txt）</label>
+                        <input id="bulkMemberFile" type="file" accept=".txt" />
+                        <button id="bulkAddBtn" onclick="bulkAddMembers()" disabled>一括追加</button>
                     </div>
                     <p style="font-size:.75rem;color:#666">※ 最初に登録する3名が各チームの代表者になります</p>
                 </div>
@@ -228,6 +237,7 @@
     <!-- ============================================================ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
 
     <script>
         // ======= 1) Firebase 設定  =======
@@ -259,7 +269,9 @@
             gameStarted: false,
             isSelectingLeaders: true,
             leaderSelected: { A:false, B:false, C:false },
-            currentTeam: 'A'
+            currentTeam: 'A',
+            currentRound: 1,           // 現在の巡目（代表者選択が1巡目）
+            pickHistory: []            // ピック履歴 [{round: 1, team: 'A', member: '山田'}]
         });
         
         // gameStateを初期化
@@ -346,6 +358,9 @@
                             gameState.teams[team] = [];
                         }
                     });
+                    // 新しいプロパティの初期化
+                    if(!gameState.currentRound) gameState.currentRound = 0;
+                    if(!gameState.pickHistory) gameState.pickHistory = [];
                 }else{
                     // 新規ルームの場合は初期状態を設定
                     gameState = initialGameState();
@@ -378,65 +393,63 @@
             userRef.onDisconnect().remove();
 
             enableUI();
-            qs('#turnIndicator').style.display='block';
-            qs('#leaveRoomBtn').style.display='inline-block';
+            qs('#turnIndicator').style.display = 'block';
             updateConnectionStatus('connected',`🟢 ルーム "${room}" に参加中`);
             updateDisplay();
         };
 
         // ルーム退室
         const leaveRoom = (showAlert = true) => {
-            if(!currentRoom) return;
-
+            if (!currentRoom) return;
+        
             const leavingRoom = currentRoom; // 退室するルーム名を保存
-            
+        
             // リスナー解除
             db.ref(`rooms/${currentRoom}`).off();
-            
+        
             // ユーザー削除
             db.ref(`rooms/${currentRoom}/users/${userId}`).remove();
-            
+        
             // UI リセット
-            currentRoom = null; // これで現在のルームをクリア
+            currentRoom = null;  // 現在のルームをクリア
             gameState = initialGameState();
             connectedUsers = {};
-            
+        
             // UI 無効化
             qs('#memberName').disabled = true;
             qs('#addMemberBtn').disabled = true;
             qs('.reset-btn').disabled = true;
             qs('#turnIndicator').style.display = 'none';
-            qs('#leaveRoomBtn').style.display = 'none';
             qs('#roomInput').value = '';
-            
+        
             updateDisplay();
             updateOnlineUsers();
             updateConnectionStatus('connected', '🟢 Firebase に接続しました（ルーム未参加）');
-            
+        
             // ルーム一覧を強制的に更新（退室したルームの緑色を解除）
             db.ref('rooms').once('value', snap => {
                 const rooms = snap.val() || {};
                 updateRoomList(rooms);
             });
-            
-            if(showAlert) {
+        
+            if (showAlert) {
                 alert('ルームから退室しました');
             }
-            
+        
             // 退室後に該当ルームのユーザー数をチェック（ゲーム開始済みは削除しない）
             setTimeout(() => {
                 db.ref(`rooms/${leavingRoom}`).once('value', snap => {
                     const roomData = snap.val();
-                    if(roomData) {
-                        const hasUsers = roomData.users && Object.keys(roomData.users).length > 0;
-                        const gameStarted = roomData.gameState && roomData.gameState.gameStarted === true;
-                        const hasMembers = roomData.gameState && roomData.gameState.members && roomData.gameState.members.length > 0;
-                        
+                    if (roomData) {
+                        const hasUsers     = roomData.users && Object.keys(roomData.users).length > 0;
+                        const gameStarted  = roomData.gameState && roomData.gameState.gameStarted === true;
+                        const hasMembers   = roomData.gameState && roomData.gameState.members && roomData.gameState.members.length > 0;
+        
                         // ユーザーが0人で、かつゲームが開始されていない、かつメンバー登録もないルームのみ削除
-                        if(!hasUsers && !gameStarted && !hasMembers) {
+                        if (!hasUsers && !gameStarted && !hasMembers) {
                             console.log(`ルーム ${leavingRoom} が空になり、ゲーム未開始、メンバーなしのため削除します`);
                             db.ref(`rooms/${leavingRoom}`).remove();
-                        } else if(!hasUsers) {
+                        } else if (!hasUsers) {
                             console.log(`ルーム ${leavingRoom} は空ですが、以下の理由で保持します:`);
                             console.log(`- ゲーム開始: ${gameStarted}`);
                             console.log(`- メンバー数: ${hasMembers ? roomData.gameState.members.length : 0}`);
@@ -484,70 +497,47 @@
             qs('#adminDialog').style.display = 'none';
         };
 
+        // 管理者ログイン
         const doAdminLogin = () => {
-            const id = qs('#adminId').value;
-            const password = qs('#adminPassword').value;
-            
-            if(id === 'admin' && password === 'admin') {
-                isAdmin = true;
-                userName = 'admin';
-                localStorage.setItem('isAdmin', 'true');
-                
-                // UI更新
-                qs('#currentUserName').innerHTML = 'admin<span class="admin-badge">管理者</span>';
-                qs('#userNameInput').style.display = 'none';
-                qs('#userNameInput').nextElementSibling.style.display = 'none';
-                qs('#adminLoginBtn').textContent = '🔓 管理者ログアウト';
-                qs('#adminLoginBtn').onclick = doAdminLogout;
-                
-                // 管理者専用要素を表示
-                document.querySelectorAll('.admin-only').forEach(el => {
-                    el.style.display = '';
-                });
-                
-                // ルーム参加中なら名前を更新
-                if(currentRoom && db) {
-                    db.ref(`rooms/${currentRoom}/users/${userId}/name`).set('admin');
-                    db.ref(`rooms/${currentRoom}/users/${userId}/isAdmin`).set(true);
-                }
-                
-                closeAdminLogin();
-                updateDisplay();
-                alert('管理者としてログインしました');
-            } else {
-                alert('IDまたはパスワードが正しくありません');
-            }
+          const username = qs('#adminId').value.trim();        // 入力欄の「admin」
+          const password = qs('#adminPassword').value;
+          if (!username || !password) { alert('IDとパスワードを入力'); return; }
+        
+          const email = `${username}@dorabura.com`;             // ダミーメールドメインを付与
+          firebase.auth()
+            .signInWithEmailAndPassword(email, password)
+            .then(() => {
+              alert('管理者としてログインしました');
+              closeAdminLogin();
+            })
+            .catch(err => {
+              console.error(err);
+              alert('ログインに失敗しました');
+            });
         };
 
+        // 管理者ログアウト
         const doAdminLogout = () => {
-            if(!confirm('管理者からログアウトしますか？')) return;
-            
-            isAdmin = false;
-            localStorage.removeItem('isAdmin');
-            userName = localStorage.getItem('draftUserName') || userId;
-            
-            // UI更新
-            qs('#currentUserName').textContent = userName;
-            qs('#userNameInput').style.display = '';
-            qs('#userNameInput').nextElementSibling.style.display = '';
-            qs('#userNameInput').value = userName;
-            qs('#adminLoginBtn').textContent = '🔐 管理者ログイン';
-            qs('#adminLoginBtn').onclick = showAdminLogin;
-            
-            // 管理者専用要素を非表示
-            document.querySelectorAll('.admin-only').forEach(el => {
-                el.style.display = 'none';
+          if (!confirm('管理者からログアウトしますか？')) return;
+          firebase.auth().signOut()
+            .then(() => {
+              alert('管理者からログアウトしました');
+              // onAuthStateChanged のコールバックで UI が切り替わります
+            })
+            .catch(err => {
+              console.error(err);
+              alert('ログアウトに失敗しました');
             });
-            
-            // ルーム参加中なら名前を更新
-            if(currentRoom && db) {
-                db.ref(`rooms/${currentRoom}/users/${userId}/name`).set(userName);
-                db.ref(`rooms/${currentRoom}/users/${userId}/isAdmin`).set(false);
-            }
-            
-            updateDisplay();
-            alert('管理者からログアウトしました');
         };
+        
+        // 管理者ログインボタンの動的切り替え
+        qs('#adminLoginBtn').addEventListener('click', () => {
+          if (firebase.auth().currentUser) {
+            doAdminLogout();
+          } else {
+            showAdminLogin();
+          }
+        });
 
         // アクティブルーム監視
         const watchActiveRooms = () => {
@@ -611,34 +601,38 @@
 
         // ルーム一覧更新
         const updateRoomList = (rooms) => {
-            const container = qs('#roomList');
-            const roomNames = Object.keys(rooms);
-            
-            if(roomNames.length === 0) {
-                container.innerHTML = '<div class="empty-state">アクティブなルームがありません</div>';
-                return;
+          const container = qs('#roomList');
+          const roomNames = Object.keys(rooms);
+          if (roomNames.length === 0) {
+            container.innerHTML = '<div class="empty-state">アクティブなルームがありません</div>';
+            return;
+          }
+          container.innerHTML = roomNames.map(roomName => {
+            const room = rooms[roomName];
+            const userCount = room.users ? Object.keys(room.users).length : 0;
+            const memberCount = room.gameState?.members?.length || 0;
+            const gameStarted = room.gameState?.gameStarted;
+            const isCurrent = roomName === currentRoom;
+        
+            // ボタンHTML
+            let btns = '';
+            if (isCurrent) {
+              // ログアウトではなく「退室」ボタンを全員に表示
+              btns += `<button class="leave-btn" onclick="event.stopPropagation(); leaveRoom()">退室</button>`;
             }
-            
-            container.innerHTML = roomNames.map(roomName => {
-                const room = rooms[roomName];
-                const userCount = room.users ? Object.keys(room.users).length : 0;
-                const memberCount = room.gameState && room.gameState.members ? room.gameState.members.length : 0;
-                const gameStarted = room.gameState && room.gameState.gameStarted;
-                const isCurrentRoom = roomName === currentRoom;
-                
-                return `
-                    <div class="room-item ${isCurrentRoom ? 'current' : ''}" 
-                         onclick="${isCurrentRoom ? '' : `selectRoom('${roomName}')`}">
-                        ${(userCount > 0 && isAdmin) ? `<button class="delete-room-btn" onclick="event.stopPropagation(); deleteRoom('${roomName}')" title="ルーム削除">×</button>` : ''}
-                        <strong>${roomName}</strong>
-                        <div style="font-size:.7rem;margin-top:2px">
-                            👥 ${userCount}人 | 📋 ${memberCount}名登録
-                            ${gameStarted ? ' | 🎮 ゲーム中' : ''}
-                            ${isCurrentRoom ? ' (参加中)' : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
+        
+            return `
+              <div class="room-item ${isCurrent?'current':''}" 
+                   onclick="${isCurrent?'':'selectRoom(\''+roomName+'\')'}" 
+                   style="position:relative">
+                <strong>${roomName}</strong>
+                <div style="font-size:.7rem;margin-top:2px">
+                  👥 ${userCount}人 | 📋 ${memberCount}名登録 ${gameStarted?'| 🎮 ゲーム中':''} ${isCurrent?'(参加中)':''}
+                </div>
+                ${btns}
+              </div>
+            `;
+          }).join('');
         };
 
         // ルーム削除
@@ -677,9 +671,21 @@
             if(users.length > 0){
                 container.style.display='block';
                 list.innerHTML = users.map(([uid, data]) => {
-                    const displayName = data.name || uid;
-                    const isMe = uid === userId;
-                    return `<span class="user-badge" style="${isMe ? 'background:#28a745' : ''}">${displayName}${isMe ? ' (自分)' : ''}</span>`;
+                  const displayName = data.name || uid;
+                  const isMe = uid === userId;
+                  // バッジ本体
+                  const badge = `<span class="user-badge" style="${isMe?'background:#28a745':''}">
+                                   ${displayName}${isMe?' (自分)':''}
+                                 </span>`;
+                  // 管理者かつ自分以外なら “×” ボタンを追加
+                  if(isAdmin && !isMe) {
+                    return `<div style="display:inline-block;position:relative">
+                              ${badge}
+                              <button class="kick-btn" onclick="kickUser('${uid}','${displayName}')" 
+                                      title="退室させる">×</button>
+                            </div>`;
+                  }
+                  return badge;
                 }).join('');
             }else{
                 container.style.display='none';
@@ -716,36 +722,71 @@
         };
 
         const selectMember = (memberName) => {
-            if(!canSelectMember()){alert('現在選択権がありません');return;}
-            
-            // 確認ポップアップを表示
-            if(!confirm(`${memberName}さんを選択しますか？`)) return;
-            
-            const idx = gameState.members.findIndex(m=>m.name===memberName);
-            if(idx===-1 || !gameState.members[idx].available) return;
-            
-            // 配属
-            gameState.members[idx].available=false;
-            
-            // teams[currentTeam]が配列であることを確認
-            if(!gameState.teams[gameState.currentTeam]) {
-                gameState.teams[gameState.currentTeam] = [];
-            }
-            
+            if (!canSelectMember()) { alert('現在選択権がありません'); return; }
+            if (!confirm(`${memberName}さんを選択しますか？`)) return;
+        
+            // --- 配属処理（既存） ---
+            const idx = gameState.members.findIndex(m => m.name === memberName);
+            gameState.members[idx].available = false;
             gameState.teams[gameState.currentTeam].push(memberName);
-
-            if(gameState.isSelectingLeaders){
+        
+            // --- 代表者選択ステージ（round 0） ---
+            if (gameState.isSelectingLeaders) {
+                gameState.pickHistory.push({ round: 0, team: gameState.currentTeam, member: memberName });
                 gameState.leaderSelected[gameState.currentTeam] = true;
-                if(!gameState.leaderSelected.A) gameState.currentTeam='A';
-                else if(!gameState.leaderSelected.B) gameState.currentTeam='B';
-                else if(!gameState.leaderSelected.C) gameState.currentTeam='C';
-                else {gameState.isSelectingLeaders=false;gameState.currentTeam='A';}
-            }else{
-                // 通常ピック: A→B→C 循環
-                const order=['A','B','C'];
-                gameState.currentTeam = order[(order.indexOf(gameState.currentTeam)+1)%3];
+        
+                // 次の代表者チーム
+                const teams     = ['A','B','C'];
+                const nextLeader = teams.find(t => !gameState.leaderSelected[t]);
+                if (nextLeader) {
+                    gameState.currentTeam = nextLeader;
+                } else {
+                    // 代表者選択完了 → 第1巡目スタート（rep picks の順番そのまま）
+                    gameState.isSelectingLeaders = false;
+                    gameState.currentRound       = 1;
+                    const repOrder = getLastRoundPicks(0).map(p => p.team);  // e.g. ['A','B','C']
+                    gameState.currentTeam = repOrder[0];                    // → 'A'
+                }
+        
+            // --- 通常ピックステージ（round ≥1） ---
+            } else {
+                gameState.pickHistory.push({
+                    round:  gameState.currentRound,
+                    team:   gameState.currentTeam,
+                    member: memberName
+                });
+                const picksThisRound = getLastRoundPicks(gameState.currentRound);
+                const numTeams       = 3;
+        
+                if (gameState.currentRound === 1) {
+                    // 第1巡目は repOrder の順
+                    const repOrder = getLastRoundPicks(0).map(p => p.team);
+                    if (picksThisRound.length < numTeams) {
+                        // まだ repOrder[picksThisRound.length] が残っている
+                        gameState.currentTeam = repOrder[picksThisRound.length];
+                    } else {
+                        // 第1巡目完了 → 第2巡目は「第1巡目 picks の逆順」
+                        gameState.currentRound++;
+                        gameState.currentTeam = repOrder.slice().reverse()[0];
+                    }
+                } else {
+                    // 第2巡目以降は「前巡の逆順」で回す
+                    if (picksThisRound.length === numTeams) {
+                        // 巡が終了 → 次の巡へ
+                        const reversed = picksThisRound.slice().reverse();
+                        gameState.currentRound++;
+                        gameState.currentTeam = reversed[0].team;
+                    } else {
+                        // 前巡逆順で、まだ選んでいないチームを選出
+                        const lastRound    = gameState.currentRound - 1;
+                        const lastPicks    = getLastRoundPicks(lastRound);
+                        const reversedLast = lastPicks.slice().reverse().map(p => p.team);
+                        const pickedTeams  = picksThisRound.map(p => p.team);
+                        gameState.currentTeam = reversedLast.find(t => !pickedTeams.includes(t));
+                    }
+                }
             }
-
+        
             syncGameState();
             checkGameEnd();
         };
@@ -768,6 +809,8 @@
             gameState.isSelectingLeaders = true;
             gameState.leaderSelected = { A:false, B:false, C:false };
             gameState.currentTeam = 'A';
+            gameState.currentRound = 0;
+            gameState.pickHistory = [];
             gameState.teams = { A: [], B: [], C: [] };
             // メンバーの available を全て true に
             gameState.members.forEach(m => m.available = true);
@@ -797,6 +840,8 @@
             gameState.isSelectingLeaders = true;
             gameState.leaderSelected = { A:false, B:false, C:false };
             gameState.currentTeam = 'A';
+            gameState.currentRound = 0;
+            gameState.pickHistory = [];
             
             syncGameState();
         };
@@ -867,7 +912,55 @@
                 `).join('');
             });
         };
-        
+
+        // 指定した巡のピック履歴を返すヘルパー
+        const getLastRoundPicks = (round) => {
+            return (gameState.pickHistory || [])
+                    .filter(p => p.round === round);
+        };
+
+        // ピック順序の更新
+        const updatePickOrder = () => {
+            const currentRoundPicks = getLastRoundPicks(gameState.currentRound);
+            const lastRoundPicks = getLastRoundPicks(gameState.currentRound - 1);
+            
+            // 現在の巡で全チームがピック済みか確認
+            const pickedTeams = currentRoundPicks.map(p => p.team);
+            const allTeamsPicked = ['A', 'B', 'C'].every(team => pickedTeams.includes(team));
+            
+            if(allTeamsPicked) {
+                // 巡が終了したので次の巡へ
+                gameState.currentRound++;
+                // 次の巡は前巡の逆順
+                const nextTeam = lastRoundPicks[0].team; // 前巡の最初のチーム
+                gameState.currentTeam = nextTeam;
+            } else {
+                // まだ巡が続いている
+                // 前巡の逆順で次のチームを決定
+                let nextIndex = -1;
+                for(let i = lastRoundPicks.length - 1; i >= 0; i--) {
+                    const team = lastRoundPicks[i].team;
+                    if(!pickedTeams.includes(team)) {
+                        gameState.currentTeam = team;
+                        break;
+                    }
+                }
+            }
+        };
+
+        // 現在のターンのメンバーを取得
+        const getCurrentTurnMember = () => {
+            if(gameState.isSelectingLeaders) return null;
+            
+            const team = gameState.teams[gameState.currentTeam];
+            const memberIndex = gameState.currentRound - 1;
+            
+            if(team && team[memberIndex]) {
+                return team[memberIndex];
+            }
+            return null;
+        };
+
         const updateTurnIndicator = () => {
             const txt = qs('#turnText');
             if(!currentRoom){
@@ -879,16 +972,14 @@
                 return;
             }
             
-            if(gameState.isSelectingLeaders) {
-                txt.textContent = `代表者選択 - チーム${gameState.currentTeam}`;
+            if (gameState.isSelectingLeaders) {
+                txt.textContent = `第${gameState.currentRound}巡目 - ${gameState.currentTeam}チーム：代表者を選択してください`;
             } else {
-                // 現在のチームで最後に選ばれたメンバーの名前を取得
-                const currentTeamMembers = gameState.teams[gameState.currentTeam];
-                if(currentTeamMembers && currentTeamMembers.length > 0) {
-                    const lastMember = currentTeamMembers[currentTeamMembers.length - 1];
-                    txt.textContent = `${lastMember}さんの番です`;
+                const currentMember = getCurrentTurnMember();
+                if(currentMember) {
+                    txt.textContent = `第${gameState.currentRound}巡目 - ${gameState.currentTeam}チーム：${currentMember}さんの番です`;
                 } else {
-                    txt.textContent = `チーム${gameState.currentTeam} の順番です`;
+                    txt.textContent = `第${gameState.currentRound}巡目 - ${gameState.currentTeam}チーム：指名権を持っている人がいません`;
                 }
             }
         };
@@ -1065,21 +1156,30 @@
         // メンバー移動の共通処理
         const moveMember = (memberName, from, to) => {
             // 元の場所から削除
+            let fromIndex = -1;
             if(from === 'available') {
                 const idx = gameState.members.findIndex(m => m.name === memberName);
                 if(idx !== -1) gameState.members[idx].available = false;
             } else {
-                const idx = gameState.teams[from].indexOf(memberName);
-                if(idx !== -1) gameState.teams[from].splice(idx, 1);
+                fromIndex = gameState.teams[from].indexOf(memberName);
+                if(fromIndex !== -1) gameState.teams[from].splice(fromIndex, 1);
             }
             
             // 新しい場所に追加
+            let toIndex = -1;
             if(to === 'available') {
                 const idx = gameState.members.findIndex(m => m.name === memberName);
                 if(idx !== -1) gameState.members[idx].available = true;
             } else {
                 if(!gameState.teams[to]) gameState.teams[to] = [];
                 gameState.teams[to].push(memberName);
+                toIndex = gameState.teams[to].length - 1;
+            }
+            
+            // ゲーム中の場合、ターン表示を更新
+            if(gameState.gameStarted && !gameState.isSelectingLeaders) {
+                // 移動によってターン表示が変わる可能性があるため再評価
+                updateDisplay();
             }
             
             syncGameState();
@@ -1112,10 +1212,44 @@
             qs('#roomInput').value = roomName;
             joinRoom();
         };
+        
+        // ======= ユーザーを強制退室させる =======
+        const kickUser = (uid, name) => {
+          if(!isAdmin) return;
+          if(!confirm(`${name}さんをルームから退室させますか？`)) return;
+          // Firebase 上のユーザー情報を削除
+          db.ref(`rooms/${currentRoom}/users/${uid}`).remove()
+            .then(() => {
+              alert(`${name}さんを退室させました`);
+            })
+            .catch(err => {
+              console.error('キック失敗:', err);
+              alert('退室処理に失敗しました');
+            });
+        };
 
         // ======= 13) ページロード後 =======
         window.addEventListener('load',()=>{
             initFirebase();
+            
+            // ④ Auth 状態の監視を追加
+            firebase.auth().onAuthStateChanged(user => {
+              if (user && user.email === 'admin@dorabura.com') {
+            // 管理者
+            isAdmin = true;
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+            qs('#adminLoginBtn').textContent = '🔓 管理者ログアウト';
+              } else {
+            // 未ログイン or 一般ユーザー
+            isAdmin = false;
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            qs('#adminLoginBtn').textContent = '🔐 管理者ログイン';
+              }
+              updateDisplay();  // 必要に応じて UI を再描画
+            });
+            
+            // 初回ロード時は管理者UIを隠す
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
             
             // ユーザー名を表示
             qs('#currentUserName').textContent = userName;
@@ -1149,6 +1283,43 @@
                 db.ref(`rooms/${currentRoom}/users/${userId}`).remove();
             }
         });
+        
+        // ファイル選択時に「一括追加」ボタンを有効化
+        qs('#bulkMemberFile').addEventListener('change', e => {
+          const file = e.target.files[0];
+          qs('#bulkAddBtn').disabled = !file;
+        });
+        
+        // 一括登録関数
+        function bulkAddMembers() {
+          if (!isAdmin) { alert('管理者のみ実行できます'); return; }
+          const fileInput = qs('#bulkMemberFile');
+          const file = fileInput.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            // 改行で分割、空行は除去
+            const names = reader.result.split(/\r?\n/).map(s => s.trim()).filter(s => s);
+            let added = 0;
+            names.forEach(name => {
+              // 重複チェック
+              if (!gameState.members.some(m => m.name === name)) {
+                gameState.members.push({ name, available: true });
+                added++;
+              }
+            });
+            if (added) {
+              syncGameState();
+              alert(`${added} 名を一括追加しました`);
+            } else {
+              alert('追加可能な名前がありませんでした（重複または空行）');
+            }
+            // リセット
+            fileInput.value = '';
+            qs('#bulkAddBtn').disabled = true;
+          };
+          reader.readAsText(file, 'UTF-8');
+        }
     </script>
 </body>
 </html>

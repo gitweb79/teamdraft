@@ -249,7 +249,7 @@
     <!-- ============================================================ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
     <script>
         // ======= 1) Firebase 設定  =======
@@ -509,46 +509,52 @@
             qs('#adminDialog').style.display = 'none';
         };
 
-        // 管理者ログイン
-        const doAdminLogin = () => {
-          const username = qs('#adminId').value.trim();        // 入力欄の「admin」
-          const password = qs('#adminPassword').value;
-          if (!username || !password) { alert('IDとパスワードを入力'); return; }
         
-          const email = `${username}@dorabura.com`;             // ダミーメールドメインを付与
-          firebase.auth()
-            .signInWithEmailAndPassword(email, password)
-            .then(() => {
-              alert('管理者としてログインしました');
-              closeAdminLogin();
+        // 管理者画面を表示するユーティリティ
+        function showAdminUI() {
+          isAdmin = true;
+          // 管理者向け要素を全表示
+          document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+          // ボタンを「ログアウト」に切り替え
+          const btn = qs('#adminLoginBtn');
+          btn.textContent = '🔓 管理者ログアウト';
+          btn.onclick = doAdminLogout;
+        }
+        
+        // 既存の doAdminLogin() はこのままでOK
+        function doAdminLogin() {
+          const pw = document.getElementById('adminPassword').value;
+          if (!pw) { alert('パスワードを入力してください'); return; }
+          db.ref('adminPassword').once('value')
+            .then(snapshot => {
+              const savedPw = snapshot.val();
+              if (pw === savedPw) {
+                closeAdminLogin();
+                showAdminUI();    // ここで先ほど定義した関数を呼び出す
+              } else {
+                alert('パスワードが違います');
+              }
             })
             .catch(err => {
-              console.error(err);
-              alert('ログインに失敗しました');
+              console.error('DB 読み込みエラー:', err);
+              alert('ログイン処理中にエラーが発生しました');
             });
-        };
+        }
 
-        // 管理者ログアウト
-        const doAdminLogout = () => {
+        // 管理者画面を隠すユーティリティ
+        function doAdminLogout() {
           if (!confirm('管理者からログアウトしますか？')) return;
-          firebase.auth().signOut()
-            .then(() => {
-              alert('管理者からログアウトしました');
-              // onAuthStateChanged のコールバックで UI が切り替わります
-            })
-            .catch(err => {
-              console.error(err);
-              alert('ログアウトに失敗しました');
-            });
-        };
+          isAdmin = false;
+          document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+          const btn = qs('#adminLoginBtn');
+          btn.textContent = '🔐 管理者ログイン';
+          btn.onclick = showAdminLogin;
+          alert('管理者からログアウトしました');
+        }
         
         // 管理者ログインボタンの動的切り替え
         qs('#adminLoginBtn').addEventListener('click', () => {
-          if (firebase.auth().currentUser) {
-            doAdminLogout();
-          } else {
-            showAdminLogin();
-          }
+
         });
 
         // アクティブルーム監視
@@ -1243,22 +1249,6 @@
         // ======= 13) ページロード後 =======
         window.addEventListener('load',()=>{
             initFirebase();
-            
-            // ④ Auth 状態の監視を追加
-            firebase.auth().onAuthStateChanged(user => {
-              if (user && user.email === 'admin@dorabura.com') {
-            // 管理者
-            isAdmin = true;
-            document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
-            qs('#adminLoginBtn').textContent = '🔓 管理者ログアウト';
-              } else {
-            // 未ログイン or 一般ユーザー
-            isAdmin = false;
-            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-            qs('#adminLoginBtn').textContent = '🔐 管理者ログイン';
-              }
-              updateDisplay();  // 必要に応じて UI を再描画
-            });
             
             // 初回ロード時は管理者UIを隠す
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');

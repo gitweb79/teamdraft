@@ -188,6 +188,8 @@
             <div class="game-controls">
                 <button id="startGameBtn" class="admin-only" style="display:none" onclick="startGame()" disabled>ルームに参加してください</button>
                 <button class="reset-btn admin-only" style="display:none" onclick="resetGame()" disabled>完全リセット</button>
+                <button id="undoBtn" class="admin-only" onclick="undo()" disabled>⇦</button>
+                <button id="redoBtn" class="admin-only" onclick="redo()" disabled>⇨</button>
             </div>
 
             <!-- ⏱️ ターン表示 -->
@@ -287,6 +289,52 @@
         let roomListListener = null;
         let draggedMember = null;
         let draggedFrom = null;
+        let stateHistory = [];
+        let historyIndex = -1;
+        
+                /**
+         * 現在の gameState を履歴にプッシュ
+         */
+        function pushHistory() {
+          // 最新状態以降の履歴を切り捨て
+          stateHistory = stateHistory.slice(0, historyIndex + 1);
+          // 深いコピーで保存
+          stateHistory.push(JSON.parse(JSON.stringify(gameState)));
+          historyIndex = stateHistory.length - 1;
+          updateNavButtons();
+        }
+        
+        /**
+         * 戻る（undo）
+         */
+        function undo() {
+          if (historyIndex > 0) {
+            historyIndex--;
+            gameState = JSON.parse(JSON.stringify(stateHistory[historyIndex]));
+            syncGameState();
+            updateDisplay();
+          }
+        }
+        
+        /**
+         * 進む（redo）
+         */
+        function redo() {
+          if (historyIndex < stateHistory.length - 1) {
+            historyIndex++;
+            gameState = JSON.parse(JSON.stringify(stateHistory[historyIndex]));
+            syncGameState();
+            updateDisplay();
+          }
+        }
+        
+        /**
+         * ボタンの有効・無効を切り替え
+         */
+        function updateNavButtons() {
+          qs('#undoBtn').disabled = !(isAdmin && historyIndex > 0);
+          qs('#redoBtn').disabled = !(isAdmin && historyIndex < stateHistory.length - 1);
+        }
         
         // デフォルト状態を返す関数
         const initialGameState = () => ({
@@ -825,6 +873,7 @@
             }
         
             syncGameState();
+            pushHistory();
             checkGameEnd();
         };
 
@@ -853,6 +902,7 @@
             gameState.members.forEach(m => m.available = true);
             
             syncGameState();
+            pushHistory();
         };
 
         const resetGame = () => {
@@ -881,6 +931,7 @@
             gameState.pickHistory = [];
             
             syncGameState();
+            pushHistory();
         };
 
         // =======10) Firebase 同期 =======
@@ -897,6 +948,7 @@
             updateTurnIndicator();
             updateTeamHighlight();
             updateStartButton();
+            updateNavButtons();
         };
 
         const updateAvailableMembers = () => {
@@ -1296,6 +1348,8 @@
                     updateUserName();
                 }
             });
+            // 初期 gameState を履歴に登録
+            pushHistory();
         });
 
         // ページ離脱時のクリーンアップ

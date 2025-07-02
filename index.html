@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>3チームドラフトシステム</title>
+    <title>チームドラフトシステム</title>
 
     <!-- =========  Simple styling (Tailwind-like, but vanilla CSS) ========= -->
     <style>
@@ -222,8 +222,21 @@
     <div id="adminDialog" class="admin-dialog">
         <div class="admin-dialog-content">
             <h3>🔐 管理者ログイン</h3>
-            <input type="text" id="adminId" placeholder="ユーザーID" />
-            <input type="password" id="adminPassword" placeholder="パスワード" />
+            <!-- 管理者ID -->
+            <input id="adminId"
+                   type="text"
+                   placeholder="ユーザーID"
+                   inputmode="latin"
+                   autocapitalize="none"
+                   spellcheck="false" />
+            
+            <!-- パスワード -->
+            <input id="adminPassword"
+                   type="password"
+                   placeholder="パスワード"
+                   inputmode="latin-password"
+                   autocapitalize="none"
+                   spellcheck="false" />
             <div class="admin-dialog-buttons">
                 <button onclick="closeAdminLogin()">キャンセル</button>
                 <button onclick="doAdminLogin()">ログイン</button>
